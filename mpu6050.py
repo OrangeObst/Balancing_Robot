@@ -106,9 +106,9 @@ class MyMPU6050:
     # @Timer(name="read raw data", text="read raw data: {milliseconds:.6f}ms")
     def get_raw_data(self, addr):
         all_data = self.bus.read_i2c_block_data(self.address, addr, 6)
-        raw_x = twos_complement((all_data[0] << 8) | all_data[1])
-        raw_y = twos_complement((all_data[2] << 8) | all_data[3])
-        raw_z = twos_complement((all_data[4] << 8) | all_data[5])
+        raw_x = _convert_to_signed((all_data[0] << 8) | all_data[1])
+        raw_y = _convert_to_signed((all_data[2] << 8) | all_data[3])
+        raw_z = _convert_to_signed((all_data[4] << 8) | all_data[5])
         return raw_x, raw_y, raw_z
 
     # @Timer(name="get raw accel data", text="get raw accel data: {milliseconds:.6f}ms")
@@ -326,7 +326,7 @@ class MyMPU6050:
             self.GZ_OFFSET = gz_offset
 
     def get_gyro_offset(self):
-        return GX_OFFSET, GY_OFFSET, GZ_OFFSET
+        return self.GX_OFFSET, self.GY_OFFSET, self.GZ_OFFSET
 
 def _convert_to_signed(value):
     if value > 32768:

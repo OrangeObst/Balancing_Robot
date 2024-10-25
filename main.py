@@ -4,7 +4,7 @@ import numpy as np
 from codetiming import Timer
 from multiprocessing import Process, Pipe, Manager
 import balance_manager
-import wheel_manager
+# import wheel_manager
 
 def stackplot_pid_values(bm : balance_manager):
 	fig, left_ax = plt.subplots(figsize = (10, 10))
@@ -124,7 +124,7 @@ def plot_all_in_one(bm : balance_manager):
 	plt.savefig('Stats.png')
 
 
-@Timer(name="Calc Loop", text="Calc loop: {:.6f}s")
+# @Timer(name="Calc Loop", text="Calc loop: {:.6f}s")
 def process_calculation(bm : balance_manager, conn_right=None, conn_left=None):
 	timer = time.time()
 	while((time.time() - timer) < 15 ):
@@ -148,16 +148,16 @@ def process_calculation(bm : balance_manager, conn_right=None, conn_left=None):
 		
 
 
-@Timer(name="Motor Loop", text="Motor: {:.6f}s")
-def motor_control(wm : wheel_manager, conn):
-	while True:
-		speed = conn.recv()
-		if(speed == 'Done'):
-			break
-		wm.set_speed(int(speed))
+# @Timer(name="Motor Loop", text="Motor: {:.6f}s")
+# def motor_control(wm : wheel_manager, conn):
+# 	while True:
+# 		speed = conn.recv()
+# 		if(speed == 'Done'):
+# 			break
+# 		wm.set_speed(int(speed))
 
-	conn.close()
-	wm.stop()
+# 	conn.close()
+# 	wm.stop()
 
 '''
 	Motor_A = 17
@@ -172,31 +172,34 @@ if __name__ == "__main__":
 
 	use_wheels = False
 	if use_wheels:
-		right_wheel = wheel_manager.Wheel_Manager(17, 4)
-		left_wheel = wheel_manager.Wheel_Manager(27, 5)
+		# right_wheel = wheel_manager.Wheel_Manager(17, 4)
+		# left_wheel = wheel_manager.Wheel_Manager(27, 5)
 	
 		parent_conn_right, child_conn_right = Pipe()
 		parent_conn_left, child_conn_left = Pipe()
 		try:
 			bm_process = Process(target=process_calculation, args=(bm, parent_conn_right, parent_conn_left))
-			right_motor_process = Process(target=motor_control, args=(right_wheel, child_conn_right))
-			left_motor_process = Process(target=motor_control, args=(left_wheel, child_conn_left))
+			# right_motor_process = Process(target=motor_control, args=(right_wheel, child_conn_right))
+			# left_motor_process = Process(target=motor_control, args=(left_wheel, child_conn_left))
 
 		finally:
-			right_wheel.stop()
-			left_wheel.stop()
+			# right_wheel.stop()
+			# left_wheel.stop()
+			pass
 	else:
 		bm_process = Process(target=process_calculation, args=(bm,))
 
 	bm_process.start()
 	if use_wheels:
-		right_motor_process.start()
-		left_motor_process.start()
+		# right_motor_process.start()
+		# left_motor_process.start()
+		pass
 
 	bm_process.join()
 	if use_wheels:
-		right_motor_process.join()
-		left_motor_process.join()
+		# right_motor_process.join()
+		# left_motor_process.join()
+		pass
 
 	subplot_p_i_d_values(bm)
 	stackplot_pid_values(bm)

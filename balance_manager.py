@@ -101,14 +101,14 @@ class Speed_Calculator(object):
         accel_z = self.lpf_z.filter(accel_z)
 
         # Calculate pitch from accelerometer and gyroscope
-        pitch_from_acceleration = math.degrees(math.atan2(-accel_x, math.sqrt(accel_y**2 + accel_z**2)))
-
+        pitch_from_acceleration = math.degrees(math.atan2(-accel_x, accel_z))
+        
         pitch_gyro_integration = self.previous_pitch + gyro_y * dt
         # print(f'Pitch from acc: {pitch_from_acceleration}, Pitch from gyro: {pitch_gyro_integration}')
         
         # Apply complementary filter
         pitch = self.alpha * pitch_gyro_integration + (1 - self.alpha) * pitch_from_acceleration
-        print(f'{pitch:.3f}')
+        print(f'pitch: {pitch:.3f}')
 
         self.imu_data.append(pitch)
         self.previous_pitch = pitch
