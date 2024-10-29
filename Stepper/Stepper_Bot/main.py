@@ -3,8 +3,7 @@ import RPi.GPIO as GPIO
 from math import degrees, atan2
 
 from smbus2 import SMBus
-from util import timed_task, plot_graphs
-from Clean_Balance_Bot import mpu6050, pid_controller
+from util import timed_task, plot_graphs, mpu6050, pid_controller
 from stepper_motor import Stepper
 
 PITCH_BIAS = 0
@@ -27,7 +26,7 @@ class BalancingRobot:
         self.v = 0.0
 
         self.alpha = 0.96
-        self.delay = 0.1
+        self.delay = 0.01
 
         self.min_velocity = min_velocity
         self.max_velocity = max_velocity
@@ -48,7 +47,7 @@ class BalancingRobot:
         accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z = self.mpu.MPU_ReadData()
 
         # Calculate pitch from accelerometer and gyroscope
-        pitch_from_acceleration = degrees(atan2(-accel_x, accel_z))
+        pitch_from_acceleration = degrees(atan2(-accel_x, -accel_z))
         pitch_gyro_integration = self.previous_pitch + gyro_y * dt
         # print(f'Pitch from acc: {pitch_from_acceleration}, Pitch from gyro: {pitch_gyro_integration}')
         
@@ -57,7 +56,7 @@ class BalancingRobot:
 
         self.previous_pitch = pitch
         self.angle = pitch - self.angle_bias
-        # print(f'Angle: {self.angle}')
+        print(f'Angle: {self.angle}')
         self.angles.append(self.angle)
 
     def control_loop_handler(self, now, dt):
@@ -99,8 +98,8 @@ if __name__ == "__main__":
     # steps = 200 / stepsetting 
     left_motor = Stepper(dir_pin=13, step_pin=19, enable_pin=12, mode_pins=(16, 17, 20), steps=400)
     right_motor = Stepper(dir_pin=24, step_pin=18, enable_pin=4, mode_pins=(21, 22, 27), steps=400)
-    left_motor.start()
-    right_motor.start()
+    # left_motor.start()
+    # right_motor.start()
 
     robot = BalancingRobot(
         left_motor=left_motor,
@@ -113,15 +112,16 @@ if __name__ == "__main__":
     timer = time.time() + 10
     try:
         while time.time() < timer:
-            robot.loop()
+            # robot.loop()
+            robot.sensor_read_task.loop()
     except KeyboardInterrupt:
         print("Interrupted")
         pass
     
-    left_motor.stop()
-    right_motor.stop()
+    # left_motor.stop()
+    # right_motor.stop()
     GPIO.cleanup()
     
-    plotter = plot_graphs.Plotter()
-    plotter.plot_angle_speed(robot.angles, robot.velocities, robot.setpoint)
-    plotter.stackplot_pid_values(robot.pterms, robot.iterms, robot.dterms)
+    # plotter = plot_graphs.Plotter()
+    # plotter.plot_angle_speed(robot.angles, robot.velocities, robot.setpoint)
+    # plotter.stackplot_pid_values(robot.pterms, robot.iterms, robot.dterms)
