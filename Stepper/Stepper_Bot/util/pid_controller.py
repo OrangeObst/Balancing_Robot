@@ -20,6 +20,7 @@ class PID_Controller(object):
         # Calculate PID terms
         pterm = self.kp * error
         iterm = self.ki * self.sum_error
+        
         # dterm = self.kd * (error - self.previous_error) / dt
         # http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-derivative-kick/
         # Derivative on measurement, in case I want to change the setpoint in the future
@@ -36,4 +37,4 @@ class PID_Controller(object):
 
 
     def set_setpoint(self, setpoint):
-        self.set_setpoint = setpoint
+        self.setpoint = setpoint

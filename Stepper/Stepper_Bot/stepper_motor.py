@@ -1,6 +1,7 @@
 import time
 import RPi.GPIO as GPIO
 from math import pi
+from codetiming import Timer
 
 
 class Stepper:
@@ -24,6 +25,8 @@ class Stepper:
         self.step_delay = 0
         self.last_step_ts = 0.0
 
+        self.timer = Timer(name="StepTimer", text="Time spent: {milliseconds:.6f}ms")
+
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.dir_pin, GPIO.OUT)
         GPIO.setup(self.step_pin, GPIO.OUT)
@@ -37,12 +40,12 @@ class Stepper:
         else:
             self.dx = -1
 
+    # @Timer(name="Motor step", text="Motor step: {milliseconds:.6f}ms")
     def step(self):
         GPIO.output(self.step_pin, GPIO.HIGH)
         time.sleep(Stepper.STEP_PULSE_WIDTH)
         GPIO.output(self.step_pin, GPIO.LOW)
         self.position += self.dx
-        # print(self.position)
 
     def start(self):
         GPIO.output(self.enable_pin, GPIO.HIGH)
@@ -60,10 +63,7 @@ class Stepper:
                 
             self.set_direction(Stepper.CW if velocity > 0 else Stepper.CCW)
 
-    def return_to_origin(self):
-        steps = self.position % self.steps
-        
-
+    # @Timer(name="Motor loop", text="Motor loop: {milliseconds:.6f}ms")
     def loop(self):
         now = time.time()
         if now - self.last_step_ts >= self.step_delay:

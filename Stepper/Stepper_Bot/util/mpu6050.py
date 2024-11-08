@@ -1,7 +1,6 @@
 from smbus2 import SMBus
 import numpy as np
 import math
-from codetiming import Timer
 import time
 
 '''
@@ -37,7 +36,7 @@ _MPU6050_WHO_AM_I = 0x75  # Divice ID register
 ACCEL_SCALE = 16384
 GYRO_SCALE = 131
 
-STANDARD_GRAVITY = 9.80665
+STANDARD_GRAVITY = 1 # 9.80665
 
 
 class MyMPU6050:
@@ -63,47 +62,20 @@ class MyMPU6050:
 
     def initialize_mpu(self):
         # Wake up MPU
-        self.bus.write_byte_data(self.address, _MPU6050_PWR_MGMT_1, 0)
+        self.bus.write_byte_data(self.address, _MPU6050_PWR_MGMT_1, 1)
         time.sleep(.01)
 
         # Reset device
         self.bus.write_byte_data(self.address, _MPU6050_SIG_PATH_RESET, 7)
         time.sleep(.01)
-
-        # Set sample rate register
-        self.bus.write_byte_data(self.address, _MPU6050_SMPLRT_DIV, 0)
         
-        # Write to Configuration registers
-        self.bus.write_byte_data(self.address, _MPU6050_CONFIG, 0)
-        
-        # Write to Gyro configuration register
+        # Settings
         self.set_accel_config(0)
         self.set_gyro_config(0)
-        # self.bus.write_byte_data(self.address, _MPU6050_GYRO_CONFIG, 0)
-
-    '''
-        ------------------ Bad Code ------------------
-    '''
-    # @Timer(name="read raw", text="read raw: {milliseconds:.6f}ms")
-    def read_raw_data(self, addr):
-        high = self.bus.read_byte_data(self.address, addr)
-        low = self.bus.read_byte_data(self.address, addr+1)
-        value = 0
-        value = _convert_to_signed( ((high << 8) | low) )
-        return value
+        self.set_smplrt_div(0)
+        self.set_dlpf_cfg(0)
 
 
-    # @Timer(name="get raw accel", text="get raw accel: {milliseconds:.6f}ms")
-    def get_raw_accel(self):
-        accel_x = self.read_raw_data(_MPU6050_ACCEL_OUT_X)
-        accel_y = self.read_raw_data(_MPU6050_ACCEL_OUT_Y)
-        accel_z = self.read_raw_data(_MPU6050_ACCEL_OUT_Z)
-        return accel_x, accel_y, accel_z
-    '''
-        --------------- End of Bad Code ---------------
-    '''
-
-    # @Timer(name="read raw data", text="read raw data: {milliseconds:.6f}ms")
     def get_raw_data(self, addr):
         all_data = self.bus.read_i2c_block_data(self.address, addr, 6)
         raw_x = _convert_to_signed((all_data[0] << 8) | all_data[1])
@@ -111,49 +83,37 @@ class MyMPU6050:
         raw_z = _convert_to_signed((all_data[4] << 8) | all_data[5])
         return raw_x, raw_y, raw_z
 
-    # @Timer(name="get raw accel data", text="get raw accel data: {milliseconds:.6f}ms")
     def get_raw_accel_data(self):
         accel_x, accel_y, accel_z = self.get_raw_data(_MPU6050_ACCEL_OUT_X)
         return accel_x, accel_y, accel_z
 
-    # @Timer(name="get raw gyro data", text="get raw gyro data: {milliseconds:.6f}ms")
     def get_raw_gyro_data(self):
         gyro_x, gyro_y, gyro_z = self.get_raw_data(_MPU6050_GYRO_OUT_X)
         return gyro_x, gyro_y, gyro_z
 
-    # @Timer(name="get all data", text="get all data: {milliseconds:.6f}ms")
-    def get_all_data(self):
+    def get_raw_data(self):
         all_data = self.bus.read_i2c_block_data(self.address, _MPU6050_ACCEL_OUT_X, 14)
         
         raw_accel_x = _convert_to_signed((all_data[0] << 8) | all_data[1])
         raw_accel_y = _convert_to_signed((all_data[2] << 8) | all_data[3])
         raw_accel_z = _convert_to_signed((all_data[4] << 8) | all_data[5])
 
-        raw_accel_x -= self.AX_OFFSET
-        raw_accel_y -= self.AY_OFFSET
-        raw_accel_z -= self.AZ_OFFSET
-
         raw_gyro_x = _convert_to_signed((all_data[8] << 8) | all_data[9])
         raw_gyro_y = _convert_to_signed((all_data[10] << 8) | all_data[11])
         raw_gyro_z = _convert_to_signed((all_data[12] << 8) | all_data[13])
 
-        raw_gyro_x -= self.GX_OFFSET
-        raw_gyro_y -= self.GY_OFFSET
-        raw_gyro_z -= self.GZ_OFFSET
-
         return raw_accel_x, raw_accel_y, raw_accel_z, raw_gyro_x, raw_gyro_y, raw_gyro_z
 
-    # @Timer(name="MPU ReadData", text="MPU ReadData: {milliseconds:.6f}ms")
     def MPU_ReadData(self):
-        accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z = self.get_all_data()
+        accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z = self.get_raw_data()
 
-        accel_x = (accel_x / self.ACCEL_SCALE) * STANDARD_GRAVITY
-        accel_y = (accel_y / self.ACCEL_SCALE) * STANDARD_GRAVITY
-        accel_z = (accel_z / self.ACCEL_SCALE) * STANDARD_GRAVITY
+        accel_x = (accel_x / self.ACCEL_SCALE)- self.AX_OFFSET
+        accel_y = (accel_y / self.ACCEL_SCALE)- self.AY_OFFSET
+        accel_z = (accel_z / self.ACCEL_SCALE)- self.AZ_OFFSET
 
-        gyro_x /= self.GYRO_SCALE
-        gyro_y /= self.GYRO_SCALE
-        gyro_z /= self.GYRO_SCALE
+        gyro_x = (gyro_x / self.GYRO_SCALE) - self.GX_OFFSET
+        gyro_y = (gyro_y / self.GYRO_SCALE) - self.GY_OFFSET
+        gyro_z = (gyro_z / self.GYRO_SCALE) - self.GZ_OFFSET
 
         return accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z
 
@@ -168,7 +128,12 @@ class MyMPU6050:
         value = self.bus.read_byte_data(self.address, address)
         return value
 
-    def calibrate_sensor(self):
+    def calibrate_sensor(self, time_dur=5):
+        self.reset_mpu()
+        self.set_register(_MPU6050_PWR_MGMT_1, 0x01)
+        
+        self.set_dlpf_cfg(1)
+        
         self.AX_OFFSET = 0.0
         self.AY_OFFSET = 0.0
         self.AZ_OFFSET = 0.0
@@ -179,9 +144,9 @@ class MyMPU6050:
         counter = 0
         
         timer = time.time()
-        while ((time.time() - timer) < 10):
+        while ((time.time() - timer) < time_dur):
             
-            accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z = self.MPU_ReadData()
+            accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z = self.get_raw_data()
             counter += 1
             
             self.AX_OFFSET += accel_x
@@ -190,7 +155,7 @@ class MyMPU6050:
             self.GX_OFFSET += gyro_x
             self.GY_OFFSET += gyro_y
             self.GZ_OFFSET += gyro_z
-
+            
             if (counter % 100) == 0:
                 print (f'Counter: {counter}')
 
@@ -200,6 +165,19 @@ class MyMPU6050:
         self.GX_OFFSET /= counter
         self.GY_OFFSET /= counter
         self.GZ_OFFSET /= counter
+
+        # Remove gravity from az readings
+        if self.AZ_OFFSET > 0:
+            self.AZ_OFFSET -= self.ACCEL_SCALE
+        else:
+            self.AZ_OFFSET += self.ACCEL_SCALE
+
+        self.AX_OFFSET /= self.ACCEL_SCALE
+        self.AY_OFFSET /= self.ACCEL_SCALE
+        self.AZ_OFFSET /= self.ACCEL_SCALE
+        self.GX_OFFSET /= self.GYRO_SCALE
+        self.GY_OFFSET /= self.GYRO_SCALE
+        self.GZ_OFFSET /= self.GYRO_SCALE
         
         print("Setting offsets to: ")
         print(f'OFFSET AX {self.AX_OFFSET}, AY {self.AY_OFFSET}, AZ {self.AZ_OFFSET}')
@@ -313,6 +291,7 @@ class MyMPU6050:
             self.AY_OFFSET = ay_offset
         if ay_offset is not None:
             self.AZ_OFFSET = az_offset
+        print(f'Set offsets to x: {self.AX_OFFSET}, y: {self.AY_OFFSET}, z: {self.AZ_OFFSET}')
 
     def get_accel_offset(self):
         return self.AX_OFFSET, self.AY_OFFSET, self.AZ_OFFSET
@@ -324,9 +303,14 @@ class MyMPU6050:
             self.GY_OFFSET = gy_offset
         if gy_offset is not None:
             self.GZ_OFFSET = gz_offset
+        print(f'Set offsets to x: {self.GX_OFFSET}, y: {self.GY_OFFSET}, z: {self.GZ_OFFSET}')
 
     def get_gyro_offset(self):
         return self.GX_OFFSET, self.GY_OFFSET, self.GZ_OFFSET
+    
+    def reset_mpu(self):
+        self.set_register(_MPU6050_PWR_MGMT_1, 0x80)
+        time.sleep(0.1)
 
 def _convert_to_signed(value):
     if value > 32768:
@@ -346,12 +330,14 @@ if __name__ == "__main__":
 
     bus = SMBus(1)
     mpu = MyMPU6050(bus)
-    mpu.set_dlpf_cfg(2)
-    mpu.set_smplrt_div(4)
+
     print("Calibrating sensor, do not move the system")
-    mpu.calibrate_sensor()
+    mpu.calibrate_sensor(5)
+
+    mpu.set_dlpf_cfg(6)
+
     # mpu.calculate_gyro_drift()
     # print(mpu.GYRO_DRIFT_X, mpu.GYRO_DRIFT_Y, mpu.GYRO_DRIFT_Z)
     # timer = time.time()
     # while ((time.time() - timer) < 10):
-    #     print(mpu.get_all_data())
+    #     print(mpu.get_raw_data())

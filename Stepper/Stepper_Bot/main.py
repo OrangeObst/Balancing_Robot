@@ -1,105 +1,172 @@
 import time
 import RPi.GPIO as GPIO
-from math import degrees, atan2
 
+from math import degrees, atan2, sqrt
 from smbus2 import SMBus
 from util import timed_task, plot_graphs, mpu6050, pid_controller
 from stepper_motor import Stepper
+from codetiming import Timer
 
-PITCH_BIAS = 0
+ALPHA = 0.98
+BALANCE_POINT = 0.0
+DELAY = 0.05
+FACTOR = 1
+AP = 9 * FACTOR
+AI = 0 * FACTOR # 3
+AD = 0.4 * FACTOR
+SP = 0.02
+SI = 0.015
+SD = 0.0
+ACC_STEPS = 5
+USE_MOTORS = True
+TIMER = 10
 
+# Best results so far alpha=0.96, balancep=0.0, delay=0.005, factor=1, KP=9, KI=2, KD=0.3, acc_step=5
 
+class LowPassFilter:
+        def __init__(self, alpha):
+            self.alpha = alpha
+            self.y = 0
+        
+        def filter(self, x):
+            self.y = self.alpha * x + (1 - self.alpha) * self.y
+            return self.y
+        
 class BalancingRobot:
-    def __init__(self, left_motor: Stepper, right_motor: Stepper, mpu: mpu6050, min_velocity, max_velocity, angle_bias=0.0):
+    def __init__(self, left_motor: Stepper, right_motor: Stepper, mpu: mpu6050, min_velocity, max_velocity, angle_setpoint=0.0):
         self.left_motor = left_motor
         self.right_motor = right_motor
         self.mpu = mpu
 
-        self.angle_bias = angle_bias
+        self.angle_setpoint = angle_setpoint
         self.angle = 0.0
-        self.previous_pitch = 0.0
+        self.previous_pitch = self.angle_setpoint
 
-        self.u = 5.0
+        self.velocity_setpoint = 0.0
+        self.a = 0.0
+        self.acceleration_steps = ACC_STEPS
         self.velocity = 0.0
         self.target_velocity = 0.0
-        self.setpoint = 0.0
-        self.v = 0.0
 
-        self.alpha = 0.96
-        self.delay = 0.01
+        self.alpha = ALPHA   # complementary filter
+
+        lpf_alpha = 0.1     # low pass filter for accelerometer
+        self.lpf_x = LowPassFilter(lpf_alpha)
+        self.lpf_y = LowPassFilter(lpf_alpha)
+        self.lpf_z = LowPassFilter(lpf_alpha)
 
         self.min_velocity = min_velocity
         self.max_velocity = max_velocity
-
-        self.pid = pid_controller.PID_Controller(5, 0.05, 0.4, self.min_velocity, self.max_velocity, self.setpoint)
-        self.sensor_read_task = timed_task.TimedTask(delay=self.delay/2, run=self.update_angle_handler)
-        self.control_loop_task = timed_task.TimedTask(delay=self.delay/2, run=self.control_loop_handler)
-        self.update_velocity_task = timed_task.TimedTask(delay=self.delay/10, run=self.update_velocity_handler)
+        self.min_angle = -5.0
+        self.max_angle = 5.0
+        
+        self.sp = SP
+        self.si = SI
+        self.sd = SD
+        self.ap = AP
+        self.ai = AI
+        self.ad = AD
+        self.delay = DELAY
+        self.speed_pid = pid_controller.PID_Controller(self.sp, self.si, self.sd, self.min_angle, self.max_angle, self.velocity_setpoint)
+        self.angle_pid = pid_controller.PID_Controller(self.ap, self.ai, self.ad, self.min_velocity, self.max_velocity, self.angle_setpoint)
+        self.sensor_read_task = timed_task.TimedTask(delay=self.delay, run=self.update_angle_handler)
+        self.control_loop_task = timed_task.TimedTask(delay=self.delay, run=self.control_loop_handler)
+        self.update_velocity_task = timed_task.TimedTask(delay=self.delay/self.acceleration_steps, run=self.update_velocity_handler)
 
         # extras
-        self.pterms = []
-        self.iterms = []
-        self.dterms = []
+        self.apterms = []
+        self.aiterms = []
+        self.adterms = []
+        self.spterms = []
+        self.siterms = []
+        self.sdterms = []
         self.angles = []
         self.velocities = []
+        self.gyro_angles = []
+        self.accel_angles = []
+        self.accelerations = []
+        self.angle_setpoints = []
 
+
+    # @Timer(name="Update angle", text="Update angle: {milliseconds:.6f}ms")
     def update_angle_handler(self, now, dt):
         accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z = self.mpu.MPU_ReadData()
-
-        # Calculate pitch from accelerometer and gyroscope
-        pitch_from_acceleration = degrees(atan2(-accel_x, -accel_z))
-        pitch_gyro_integration = self.previous_pitch + gyro_y * dt
-        # print(f'Pitch from acc: {pitch_from_acceleration}, Pitch from gyro: {pitch_gyro_integration}')
         
+        # Calculate pitch from accelerometer and gyroscope
+        # pitch_from_acceleration = degrees(atan2(accel_x, -accel_z))
+        pitch_from_acceleration = degrees(atan2(accel_x, sqrt(accel_y**2 + accel_z**2)))
+        pitch_gyro_integration = self.previous_pitch + gyro_y * dt
+        # print(f'Pitch from acc: {pitch_from_acceleration:.4f} | Pitch from gyro: {pitch_gyro_integration:.4f}')
+
         # Apply complementary filter
         pitch = self.alpha * pitch_gyro_integration + (1 - self.alpha) * pitch_from_acceleration
 
         self.previous_pitch = pitch
-        self.angle = pitch - self.angle_bias
+        self.angle = pitch - BALANCE_POINT
         print(f'Angle: {self.angle}')
+        
         self.angles.append(self.angle)
+        self.accel_angles.append(pitch_from_acceleration - BALANCE_POINT)
+        self.gyro_angles.append(pitch_gyro_integration - BALANCE_POINT)
 
+    # @Timer(name="Update PID", text="Update PID: {milliseconds:.6f}ms")
     def control_loop_handler(self, now, dt):
-        u,p,i,d = self.pid.update(self.angle, dt)
-        self.target_velocity = u
-        self.v = (self.target_velocity - self.velocity) / 5
-        print(f"Angle: {self.angle:.3f}; Target_velocity: {self.target_velocity}; Step_Delay: {self.left_motor.step_delay}")
-        self.pterms.append(p)
-        self.iterms.append(i)
-        self.dterms.append(d)
+        angle, sp, si, sd = self.speed_pid.update(self.velocity, dt)
+        print(f'test: {angle}, {sp}, {si}, {sd}')
+        self.angle_pid.set_setpoint(angle)
 
+        s, ap, ai, ad = self.angle_pid.update(self.angle, dt)
+        self.target_velocity = s
+        self.a = (self.target_velocity - self.velocity) / self.acceleration_steps
+        # print(f"Angle: {self.angle:.4f}; Target_velocity: {self.target_velocity:.4f}; Step_Delay: {self.left_motor.step_delay:.4f}")
+        
+        self.apterms.append(ap)
+        self.aiterms.append(ai)
+        self.adterms.append(ad)
+        self.spterms.append(sp)
+        self.siterms.append(si)
+        self.sdterms.append(sd)
+        self.velocities.append(self.target_velocity)
+
+    # @Timer(name="Update velocity", text="Update velocity: {milliseconds:.6f}ms")
     def update_velocity_handler(self, now, dt):
-        self.velocity += self.v
+        self.velocity += self.a
         if self.velocity > self.max_velocity:
             self.velocity = self.max_velocity
         if self.velocity < self.min_velocity:
             self.velocity = self.min_velocity
 
-        self.velocities.append(self.velocity)
-        print(f'Current velocity: {self.velocity}')
+        self.accelerations.append(self.velocity)
+        # print(f'Current velocity: {self.velocity:.4f}')
         self.left_motor.set_velocity(self.velocity)
         self.right_motor.set_velocity(-self.velocity)
 
+    # @Timer(name="Main loop", text="Main loop: {milliseconds:.6f}ms")
     def loop(self):
         self.sensor_read_task.loop()
         self.control_loop_task.loop()
         self.update_velocity_task.loop()
-        self.left_motor.loop()
-        self.right_motor.loop()
+        if USE_MOTORS:
+            self.left_motor.loop()
+            self.right_motor.loop()
 
 
 if __name__ == "__main__":
 
     bus = SMBus(1)
     mpu = mpu6050.MyMPU6050(bus)
-    mpu.set_dlpf_cfg(2)
-    mpu.set_smplrt_div(4)
-    
-    # steps = 200 / stepsetting 
-    left_motor = Stepper(dir_pin=13, step_pin=19, enable_pin=12, mode_pins=(16, 17, 20), steps=400)
-    right_motor = Stepper(dir_pin=24, step_pin=18, enable_pin=4, mode_pins=(21, 22, 27), steps=400)
-    # left_motor.start()
-    # right_motor.start()
+    mpu.calibrate_sensor(2)
+    mpu.set_dlpf_cfg(6)
+    mpu.set_accel_offset(0.059984, -0.039342, 0.097467) # 0.070627, -0.039342, 0.097467
+    mpu.set_gyro_offset(0.552760, 0.509830, 0.787613)   # 0.474419, 0.449830, 0.787613
+    # TODO: See what's wrong with the calibration values
+
+    # steps = 200 / microstep-setting 
+    left_motor = Stepper(dir_pin=13, step_pin=19, enable_pin=12, mode_pins=(16, 17, 20), steps=800)
+    right_motor = Stepper(dir_pin=24, step_pin=18, enable_pin=4, mode_pins=(21, 22, 27), steps=800)
+    if USE_MOTORS:
+        left_motor.start()
+        right_motor.start()
 
     robot = BalancingRobot(
         left_motor=left_motor,
@@ -107,21 +174,53 @@ if __name__ == "__main__":
         mpu=mpu,
         min_velocity=-100,
         max_velocity=100,
-        angle_bias=PITCH_BIAS)
+        angle_setpoint=BALANCE_POINT)
 
-    timer = time.time() + 10
+    timer = time.time() + TIMER
     try:
         while time.time() < timer:
-            # robot.loop()
-            robot.sensor_read_task.loop()
+            robot.loop()
+            
     except KeyboardInterrupt:
         print("Interrupted")
         pass
     
-    # left_motor.stop()
-    # right_motor.stop()
+    if USE_MOTORS:
+        left_motor.stop()
+        right_motor.stop()
+
     GPIO.cleanup()
-    
-    # plotter = plot_graphs.Plotter()
-    # plotter.plot_angle_speed(robot.angles, robot.velocities, robot.setpoint)
-    # plotter.stackplot_pid_values(robot.pterms, robot.iterms, robot.dterms)
+
+    angle_pid = [
+        robot.ap,
+        robot.ai,
+        robot.ad
+    ]
+    speed_pid = [
+        robot.sp,
+        robot.si,
+        robot.sd
+    ]
+    collected_data = {
+        'angles': robot.angles, 
+        'accel_angles': robot.accel_angles, 
+        'gyro_angles': robot.gyro_angles, 
+        'velocities': robot.velocities, 
+        'accelerations': robot.accelerations, 
+        'angle_setpoint': robot.angle_setpoint,
+        'speed_setpoint': robot.velocity_setpoint, 
+        'apterms': robot.apterms, 
+        'aiterms': robot.aiterms, 
+        'adterms': robot.adterms,
+        'spterms': robot.spterms,
+        'siterms': robot.siterms,
+        'sdterms': robot.sdterms
+    }
+
+    plotter = plot_graphs.Plotter(angle_pid, speed_pid, collected_data, TIMER)
+    plotter.plot_angle_speed(robot.angles, robot.velocities, robot.accelerations)
+    plotter.stackplot_pid_values(robot.apterms, robot.aiterms, robot.adterms, "Angle_PID_stackplot")
+    plotter.stackplot_pid_values(robot.spterms, robot.siterms, robot.sdterms, "Speed_PID_stackplot")
+    plotter.plot_angles(robot.accel_angles, robot.gyro_angles)
+    plotter.subplot_p_i_d_values(angle_pid, robot.apterms, robot.aiterms, robot.adterms, 10, "Angle_PID_subplot")
+    plotter.subplot_p_i_d_values(speed_pid, robot.spterms, robot.siterms, robot.sdterms, 3, "Speed_PID_subplot")
