@@ -1,5 +1,7 @@
 import time
 import RPi.GPIO as GPIO
+import json
+import paho.mqtt.client as mqtt
 
 from math import degrees, atan2, sqrt
 from smbus2 import SMBus
@@ -8,18 +10,19 @@ from stepper_motor import Stepper
 from codetiming import Timer
 
 ALPHA = 0.98
-BALANCE_POINT = 0.0
+BALANCE_POINT = -0.09
 DELAY = 0.05
 FACTOR = 1
-AP = 9 * FACTOR
-AI = 0 * FACTOR # 3
-AD = 0.4 * FACTOR
-SP = 0.02
-SI = 0.015
+AP = 9           #9   * FACTOR
+AI = 0           #    * FACTOR # 3
+AD = 0.3         #0.3 * FACTOR
+SP = 0.005
+SI = 0.003
 SD = 0.0
 ACC_STEPS = 5
 USE_MOTORS = True
 TIMER = 10
+REMOTE = False
 
 # Best results so far alpha=0.96, balancep=0.0, delay=0.005, factor=1, KP=9, KI=2, KD=0.3, acc_step=5
 
@@ -34,14 +37,17 @@ class LowPassFilter:
         
 class BalancingRobot:
     def __init__(self, left_motor: Stepper, right_motor: Stepper, mpu: mpu6050, min_velocity, max_velocity, angle_setpoint=0.0):
+        # Hardware
         self.left_motor = left_motor
         self.right_motor = right_motor
         self.mpu = mpu
 
+        # Angles
         self.angle_setpoint = angle_setpoint
         self.angle = 0.0
         self.previous_pitch = self.angle_setpoint
 
+        # Velocities
         self.velocity_setpoint = 0.0
         self.a = 0.0
         self.acceleration_steps = ACC_STEPS
@@ -49,11 +55,6 @@ class BalancingRobot:
         self.target_velocity = 0.0
 
         self.alpha = ALPHA   # complementary filter
-
-        lpf_alpha = 0.1     # low pass filter for accelerometer
-        self.lpf_x = LowPassFilter(lpf_alpha)
-        self.lpf_y = LowPassFilter(lpf_alpha)
-        self.lpf_z = LowPassFilter(lpf_alpha)
 
         self.min_velocity = min_velocity
         self.max_velocity = max_velocity
@@ -73,6 +74,35 @@ class BalancingRobot:
         self.control_loop_task = timed_task.TimedTask(delay=self.delay, run=self.control_loop_handler)
         self.update_velocity_task = timed_task.TimedTask(delay=self.delay/self.acceleration_steps, run=self.update_velocity_handler)
 
+        # MqttConnector
+        if REMOTE:
+            self.send_data_task = timed_task.TimedTask(delay=self.delay, run=self.send_data_to_remote)
+            self.broker = "10.224.64.29"
+            self.port = 1883
+            self.send_topic = "mpu6050/data"
+            self.receive_topic = "mpu6050/data"
+            self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+            self.data = []
+
+            def on_connect(client, userdata, flags, rc, *args, **kwargs):
+                print(f"Connected with result code {rc}")
+                client.subscribe(self.receive_topic)
+
+            def on_publish(client, userdata, mid, *args, **kwargs):
+                print(f"Message {mid} published.")
+
+            def on_message(client, userdata, msg):
+                message = msg.payload.decode()
+                message = json.loads(message)
+                self.data = message
+                print(f"Received message: {message}")
+
+            self.client.on_connect = on_connect
+            self.client.on_publish = on_publish
+            self.client.on_message = on_message
+            self.client.connect(self.broker, self.port, 60)
+            self.client.loop_start()
+
         # extras
         self.apterms = []
         self.aiterms = []
@@ -88,32 +118,38 @@ class BalancingRobot:
         self.angle_setpoints = []
 
 
+    def send_data_to_remote(self, now, dt):
+        data = mpu.MPU_ReadData()
+        payload = json.dumps(data)
+        self.client.publish(self.send_topic, payload)
+
     # @Timer(name="Update angle", text="Update angle: {milliseconds:.6f}ms")
     def update_angle_handler(self, now, dt):
-        accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z = self.mpu.MPU_ReadData()
-        
-        # Calculate pitch from accelerometer and gyroscope
-        # pitch_from_acceleration = degrees(atan2(accel_x, -accel_z))
-        pitch_from_acceleration = degrees(atan2(accel_x, sqrt(accel_y**2 + accel_z**2)))
-        pitch_gyro_integration = self.previous_pitch + gyro_y * dt
-        # print(f'Pitch from acc: {pitch_from_acceleration:.4f} | Pitch from gyro: {pitch_gyro_integration:.4f}')
+        # accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z = self.mpu.MPU_ReadData()
+        self.data = self.mpu.MPU_ReadData()
+        if self.data:
+            # accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z = self.data
+            # Calculate pitch from accelerometer and gyroscope
+            # pitch_from_acceleration = degrees(atan2(accel_x, -accel_z))
+            pitch_from_acceleration = degrees(atan2(self.data[0], sqrt(self.data[1]**2 + self.data[2]**2)))
+            pitch_gyro_integration = self.previous_pitch + self.data[4] * dt
 
-        # Apply complementary filter
-        pitch = self.alpha * pitch_gyro_integration + (1 - self.alpha) * pitch_from_acceleration
+            # Apply complementary filter
+            pitch = self.alpha * pitch_gyro_integration + (1 - self.alpha) * pitch_from_acceleration
 
-        self.previous_pitch = pitch
-        self.angle = pitch - BALANCE_POINT
-        print(f'Angle: {self.angle}')
-        
-        self.angles.append(self.angle)
-        self.accel_angles.append(pitch_from_acceleration - BALANCE_POINT)
-        self.gyro_angles.append(pitch_gyro_integration - BALANCE_POINT)
+            self.previous_pitch = pitch
+            self.angle = pitch - BALANCE_POINT
+            print(f'Angle: {self.angle:.5}')
+            
+            self.angles.append(self.angle)
+            self.accel_angles.append(pitch_from_acceleration - BALANCE_POINT)
+            self.gyro_angles.append(pitch_gyro_integration - BALANCE_POINT)
 
     # @Timer(name="Update PID", text="Update PID: {milliseconds:.6f}ms")
     def control_loop_handler(self, now, dt):
         angle, sp, si, sd = self.speed_pid.update(self.velocity, dt)
-        print(f'test: {angle}, {sp}, {si}, {sd}')
-        self.angle_pid.set_setpoint(angle)
+        # print(f'test: {angle}, {sp}, {si}, {sd}')
+        self.angle_pid.set_setpoint(-angle)
 
         s, ap, ai, ad = self.angle_pid.update(self.angle, dt)
         self.target_velocity = s
@@ -143,6 +179,9 @@ class BalancingRobot:
 
     # @Timer(name="Main loop", text="Main loop: {milliseconds:.6f}ms")
     def loop(self):
+        if REMOTE:
+            self.send_data_task.loop()
+
         self.sensor_read_task.loop()
         self.control_loop_task.loop()
         self.update_velocity_task.loop()
@@ -155,11 +194,10 @@ if __name__ == "__main__":
 
     bus = SMBus(1)
     mpu = mpu6050.MyMPU6050(bus)
-    mpu.calibrate_sensor(2)
+    # mpu.calibrate_sensor(2)
     mpu.set_dlpf_cfg(6)
     mpu.set_accel_offset(0.059984, -0.039342, 0.097467) # 0.070627, -0.039342, 0.097467
     mpu.set_gyro_offset(0.552760, 0.509830, 0.787613)   # 0.474419, 0.449830, 0.787613
-    # TODO: See what's wrong with the calibration values
 
     # steps = 200 / microstep-setting 
     left_motor = Stepper(dir_pin=13, step_pin=19, enable_pin=12, mode_pins=(16, 17, 20), steps=800)
@@ -207,8 +245,6 @@ if __name__ == "__main__":
         'gyro_angles': robot.gyro_angles, 
         'velocities': robot.velocities, 
         'accelerations': robot.accelerations, 
-        'angle_setpoint': robot.angle_setpoint,
-        'speed_setpoint': robot.velocity_setpoint, 
         'apterms': robot.apterms, 
         'aiterms': robot.aiterms, 
         'adterms': robot.adterms,
@@ -218,9 +254,10 @@ if __name__ == "__main__":
     }
 
     plotter = plot_graphs.Plotter(angle_pid, speed_pid, collected_data, TIMER)
+    plotter.print_averages()
     plotter.plot_angle_speed(robot.angles, robot.velocities, robot.accelerations)
-    plotter.stackplot_pid_values(robot.apterms, robot.aiterms, robot.adterms, "Angle_PID_stackplot")
-    plotter.stackplot_pid_values(robot.spterms, robot.siterms, robot.sdterms, "Speed_PID_stackplot")
+    plotter.stackplot_pid_values(robot.apterms, robot.aiterms, robot.adterms, 100, "Angle_PID_stackplot")
+    plotter.stackplot_pid_values(robot.spterms, robot.siterms, robot.sdterms, 2, "Speed_PID_stackplot")
     plotter.plot_angles(robot.accel_angles, robot.gyro_angles)
     plotter.subplot_p_i_d_values(angle_pid, robot.apterms, robot.aiterms, robot.adterms, 10, "Angle_PID_subplot")
-    plotter.subplot_p_i_d_values(speed_pid, robot.spterms, robot.siterms, robot.sdterms, 3, "Speed_PID_subplot")
+    plotter.subplot_p_i_d_values(speed_pid, robot.spterms, robot.siterms, robot.sdterms, 2, "Speed_PID_subplot")
