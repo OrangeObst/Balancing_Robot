@@ -48,28 +48,29 @@ client.loop_start()
 message_counter = 0
 
 try:
-    end_time = time.time() + 5
-
+    end_time = time.time() + 1800
+    counter = 0
     while(time.time() < end_time):
         start_time = time.time()
-        loop_time = start_time + 0.01
+        loop_time = start_time + 0.002
         
         data = mpu.MPU_ReadData()
 
-        payload = json.dumps([data, start_time])
-
-        result = client.publish(topic, payload)
+        payload = json.dumps([data, start_time, counter])
+        counter += 1
+        result = client.publish(topic, payload, qos=0)
         message_counter += 1
         
-        # remaining_time = end_time - time.time()
-        # if remaining_time < 0.01:
-        #     break
-        time.sleep(loop_time - time.time())
+        remaining_time = loop_time - time.time()
+        if remaining_time > 0:
+            time.sleep(remaining_time)
+        
 
     data = 'Done'
-    payload = json.dumps([data, start_time])
+    payload = json.dumps([data, start_time, counter])
     client.publish(topic, payload)
     print("Should be done")
+    print(f"Haha {counter}")
 
 except KeyboardInterrupt:
     print("Exiting...")

@@ -2,10 +2,11 @@ import time
 import RPi.GPIO as GPIO
 from math import pi
 from codetiming import Timer
+from multiprocessing import Lock
 
 
 class Stepper:
-    MIN_VELOCITY_THRESHOLD = 1e-6
+    MIN_VELOCITY_THRESHOLD = 0.5
     MIN_STEP_DELAY = 0.00033        # Max 3000 Steps pro Sekunde
     MAX_STEP_DELAY = 1e6
     STEP_PULSE_WIDTH = 1e-6
@@ -13,19 +14,19 @@ class Stepper:
     CW = GPIO.HIGH
     CCW = GPIO.LOW
 
-    def __init__(self, dir_pin, step_pin, enable_pin, mode_pins, steps=200):
+    def __init__(self, dir_pin, step_pin, enable_pin, mode_pins, invert_direction=False, steps=200):
         self.dir_pin = dir_pin
         self.step_pin = step_pin
         self.enable_pin = enable_pin
         self.mode_pins = mode_pins
+        self.invert_direction = invert_direction
         self.steps = steps
+        self.lock = Lock()
 
         self.position = 0
         self.dx = 1
-        self.step_delay = 0
+        self.step_delay = 2
         self.last_step_ts = 0.0
-
-        self.timer = Timer(name="StepTimer", text="Time spent: {milliseconds:.6f}ms")
 
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.dir_pin, GPIO.OUT)
@@ -34,24 +35,30 @@ class Stepper:
         GPIO.setup(self.mode_pins, GPIO.OUT)
 
     def set_direction(self, direction):
+        if self.invert_direction:
+            direction = not direction
         GPIO.output(self.dir_pin, direction)
         if direction == Stepper.CW:
-            self.dx = 1
+            self.dx = -1 if self.invert_direction else 1
         else:
-            self.dx = -1
+            self.dx = 1 if self.invert_direction else -1
 
     # @Timer(name="Motor step", text="Motor step: {milliseconds:.6f}ms")
     def step(self):
-        GPIO.output(self.step_pin, GPIO.HIGH)
-        time.sleep(Stepper.STEP_PULSE_WIDTH)
-        GPIO.output(self.step_pin, GPIO.LOW)
-        self.position += self.dx
+        with self.lock:
+            GPIO.output(self.step_pin, GPIO.HIGH)
+            time.sleep(Stepper.STEP_PULSE_WIDTH)
+            GPIO.output(self.step_pin, GPIO.LOW)
+            self.position += self.dx
 
     def start(self):
         GPIO.output(self.enable_pin, GPIO.HIGH)
 
     def stop(self):
         GPIO.output(self.enable_pin, GPIO.LOW)
+
+    def get_position(self):
+        return self.position
 
     def set_velocity(self, velocity):
         if abs(velocity) < Stepper.MIN_VELOCITY_THRESHOLD:

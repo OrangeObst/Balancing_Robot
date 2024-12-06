@@ -22,6 +22,7 @@ def on_message(client, userdata, msg):
     message = json.loads(message)
     latency = time.time() - float(message[1])
     latency_measurements.append(latency)
+    # if (message_counter % 100) == 0:
     print(f"Received message nr. {message_counter}: {message[0]} with latency {latency}")
     if(message[0] == 'Done'):
         print(f'Mean latency is: {np.mean(latency_measurements)}')
