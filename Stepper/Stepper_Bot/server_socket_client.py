@@ -55,6 +55,7 @@ class ServerSocket:
         self.data = []
 
         self.synchronize_time()
+        self.last_time = time.time()
 
         self.update_angle_task = TimedTask(delay=0.01, run=self.update_angle_handler)
 
@@ -74,12 +75,12 @@ class ServerSocket:
         timestamps = []
         imu_data = []
         delays = []
-        for data_set, t in self.collected_data:
-            timestamps.append(data_set[0])
-            imu_data.append(data_set[1])
-            delays.append(t)
-        
         with self.lock:
+            for data_set, t in self.collected_data:
+                timestamps.append(data_set[0])
+                imu_data.append(data_set)
+                delays.append(t)
+            print(imu_data, delays)
             self.collected_data.clear()
 
         # Interpolation
@@ -87,6 +88,7 @@ class ServerSocket:
         new_timestamps = np.arange(timestamps[0], timestamps[-1], interval)
         # test interval = timestamps[-1] - timestamps[0]
         interpolated_data = interp_func(new_timestamps)
+        print(interpolated_data)
         self.average_data(interpolated_data, len(interpolated_data))
     
     def average_data(self, interpolated_data, window_size=3):
@@ -96,31 +98,41 @@ class ServerSocket:
         ]).T
         self.data = averaged_data[0]
 
-    def update_angle_handler(self, now, dt):
-        if len(self.collected_data) > 3:
-            print("test2")
-            self.synchronize_and_interpolate()
-            # Calculate pitch from accelerometer and gyroscope
-            pitch_from_acceleration = degrees(atan2(self.data[0], sqrt(self.data[1]**2 + self.data[2]**2)))
-            pitch_gyro_integration = self.previous_pitch + self.data[4] * dt
+    def update_angle_handler(self, now, ttdt):
+        with self.lock:
+            data_len = len(self.collected_data)
 
-            # Apply complementary filter
-            pitch = self.alpha * pitch_gyro_integration + (1 - self.alpha) * pitch_from_acceleration
+        if data_len > 3:
+            # self.synchronize_and_interpolate()
+            with self.lock:
+                self.data = self.collected_data.copy()
+                self.collected_data.clear()
 
-            self.previous_pitch = pitch
-            self.angle = pitch
-            print(f'Angle: {self.angle:.5}, imu_data: {self.data}, dt: {dt}')
+            for data in self.data:
+                # Calculate pitch from accelerometer and gyroscope
+                dt = data[1] - self.last_time
+                pitch_from_acceleration = degrees(atan2(data[0][0], sqrt(data[0][1]**2 + data[0][2]**2)))
+                pitch_gyro_integration = self.previous_pitch + data[0][4] * dt
+
+                # Apply complementary filter
+                pitch = self.alpha * pitch_gyro_integration + (1 - self.alpha) * pitch_from_acceleration
+
+                self.last_time = data[1]
+                self.previous_pitch = pitch
+                self.angle = pitch
+                print(f'Angle: {self.angle:.5}, imu_data: {data}, dt: {dt}')
+                
 
 
     def send_data(self):
         while True:
             self.update_angle_task.loop()
+            time.sleep(0.01)
 
     def receive_data(self):
         while True:
             try:
                 data, addr = self.sock.recvfrom(128)
-                print(data)
             except socket.timeout as e:
                 err = e.args[0]
                 # this next if/else is a bit redundant, but illustrates how the
@@ -146,7 +158,7 @@ class ServerSocket:
                     # self.update_angle_handler(message[0], dt)
                     with self.lock:
                         self.collected_data.append(message)
-                    
+                    # print(self.collected_data)
                 except json.JSONDecodeError as e:
                     print(f"JSON decode error: {e}")
                     print(f"Received data: {data}")

@@ -1,16 +1,14 @@
 import time
 import RPi.GPIO as GPIO
 import json
-import paho.mqtt.client as mqtt
-
 import numpy as np
 from scipy.interpolate import interp1d
 from multiprocessing import Lock
 from math import degrees, atan2, sqrt
 from smbus2 import SMBus
-from util import timed_task, plot_graphs, mpu6050, pid_controller, pid_filtered, mqtt_connector
+from util import timed_task, plot_graphs, mpu6050, pid_controller, pid_filtered
 from stepper_motor import Stepper
-from codetiming import Timer
+# from codetiming import Timer
 
 SPEED_FACTOR = 0.5      # 0.5   
 ALPHA = 0.98            # 0.98
@@ -109,20 +107,6 @@ class BalancingRobot:
         self.update_angle_task = timed_task.TimedTask(delay=self.delay, run=self.update_angle_handler)
         self.control_loop_task = timed_task.TimedTask(delay=self.delay, run=self.control_loop_handler)
 
-        # MqttConnector
-        if REMOTE:
-            self.send_data_task = timed_task.TimedTask(delay=0.003, run=self.send_data_to_remote)
-
-            def on_message(client, userdata, msg):
-                message = msg.payload.decode()
-                message = json.loads(message)
-                delay = time.time() - message[0]
-                with self.lock:
-                    self.data_buffer.append([message, delay])
-                # print(f"Received message: {message} with delay: {delay:.4f}")
-
-            self.mqtt_client = mqtt_connector.MqttConnector(on_message)
-            self.mqtt_client.connect_client()
 
         # extras
         self.apterms = []
@@ -148,11 +132,6 @@ class BalancingRobot:
         self.target_angles = []
         self.filtered_data = []
 
-
-    def send_data_to_remote(self, now, dt):
-        data = mpu.MPU_ReadData()
-        payload = json.dumps([now, data])
-        self.mqtt_client.publish_data(payload)
 
     def synchronize_and_interpolate(self, interval=3):
         # timestamps = [ts for ts,_ in self.data_buffer[0]]
