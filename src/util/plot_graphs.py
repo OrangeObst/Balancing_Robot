@@ -86,58 +86,74 @@ class Plotter:
         self,
         left_axis_key: str,
         left_axis_values: dict[list[float]],
-        right_axis_key: str,
-        right_axis_values: dict[list[float]],
+        right_axis_key: str = None,
+        right_axis_values: dict[list[float]] = None,
         name: str = "Measurement_Plot"
     ):
         """
-        Plot multiple series on the left axis and multiple series on the right axis.
+        Plot multiple series on the left axis and optionally on the right axis.
         :param left_axis_key: Label for the left axis
         :param left_axis_values: List of lists of values for the left axis
-        :param right_axis_key: Label for the right axis
-        :param right_axis_values: List of lists of values for the right axis
+        :param right_axis_key: [Optional] Label for the right axis
+        :param right_axis_values: [Optional] List of lists of values for the right axis
         :param name: Output plot file name (default: "Measurement_Plot")
         """
 
         fig, left_ax = plt.subplots(figsize=(6.4, 4.8))
-        right_ax = left_ax.twinx()
 
-        max_len = max(
-            (max(len(values) for values in left_axis_values.values()) if left_axis_values else 1,
-            max(len(values) for values in right_axis_values.values()) if right_axis_values else 1),
-            default=1
-        )
-        max_value_left = max(max(abs(x) for x in sublist) for sublist in left_axis_values.values())
-        max_value_right = max(max(abs(x) for x in sublist) for sublist in right_axis_values.values())
+        # Determine if we need a right axis
+        if right_axis_values is not None:
+            right_ax = left_ax.twinx()
+            axes_values_list = [left_axis_values, right_axis_values]
+            axes_keys_list = [left_axis_key, right_axis_key]
+        else:
+            axes_values_list = [left_axis_values]
+            axes_keys_list = [left_axis_key]
+
+        # Calculate max length and values (considering both axes if applicable)
+        max_len = max((max(len(values) for values in axis_values.values()) if axis_values else 1 for axis_values in axes_values_list), default=1)
+        max_values = [max(max(abs(x) for x in sublist) for sublist in axis_values.values()) if axis_values else 0 for axis_values in axes_values_list]
 
         time_values = np.linspace(0, self.timer, max_len)
 
-        colors = plt.cm.tab20(range(len(left_axis_values)+len(right_axis_values)))
+        # Colors for all series across both axes
+        colors = plt.cm.tab20(range(sum(len(axis_values) for axis_values in axes_values_list)))
         counter = 0
-        for key, values in left_axis_values.items():
-            plot_values = values[:max_len]
-            time_values_plot = time_values[:len(plot_values)]
-            left_ax.plot(time_values_plot, plot_values, label=f"{key}", color=colors[counter])
-            counter += 1
 
-        for key, values in right_axis_values.items():
-            plot_values = values[:max_len]
-            time_values_plot = time_values[:len(plot_values)]
-            right_ax.plot(time_values_plot, plot_values, label=f"{key}", color=colors[counter])
-            counter += 1
+        # Plot values for both axes
+        for ax, (axis_key, axis_values) in enumerate(zip(axes_keys_list, axes_values_list)):
+            if ax == 1:  # Right axis
+                current_ax = right_ax
+            else:
+                current_ax = left_ax
 
+            for key, values in axis_values.items():
+                plot_values = values[:max_len]
+                time_values_plot = time_values[:len(plot_values)]
+                current_ax.plot(time_values_plot, plot_values, label=f"{key}", color=colors[counter])
+                counter += 1
+
+        # Set limits and labels for both axes
         left_ax.set_xlim(0, self.timer)
-        left_ax.set_ylim(-max_value_left, max_value_left)
+        left_ax.set_ylim(-max_values[0], max_values[0])
         left_ax.set_xlabel('Time [s]')
         left_ax.set_ylabel(left_axis_key)
-        right_ax.set_ylabel(right_axis_key)
-        right_ax.set_ylim(-max_value_right, max_value_right)
+        
+        if right_axis_values is not None:
+            right_ax.set_ylim(-max_values[1], max_values[1])
+            right_ax.set_ylabel(right_axis_key)
 
-        fig.legend(handles=left_ax.lines + right_ax.lines, 
-        labels=[f"{key}" for key, values in left_axis_values.items()] + [f"{key}" for key, values in right_axis_values.items()], 
-        loc='upper right', ncol=2)
+        # Legend handling (combine labels if both axes are used)
+        if right_axis_values is not None:
+            fig.legend(handles=left_ax.lines + right_ax.lines, 
+                        labels=[f"{key}" for key, values in left_axis_values.items()] + [f"{key}" for key, values in right_axis_values.items()], 
+                        loc='upper right', ncol=2)
+        else:
+            fig.legend(handles=left_ax.lines, 
+                        labels=[f"{key}" for key, values in left_axis_values.items()], 
+                        loc='upper right', ncol=2)
 
-        left_ax.axhline(y = 0.0, linestyle = '--')
+        left_ax.axhline(y=0.0, linestyle='--')
         # plt.title(f'Measurements {self.title}')
         plt.savefig(f'graphs/{name}')
 

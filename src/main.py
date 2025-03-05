@@ -22,9 +22,9 @@ PP = 0.005               # 0.005
 PI = 0.0                # 0.0
 PD = 0.0                # 0.6
 TIMER = 10
-MICROSTEPS = 4
+MICROSTEPS = 8
 MAX_TARGET_ANGLE = 5
-USE_MOTORS = True
+USE_MOTORS = False
 REMOTE = False
 AVERAGED = False
 CALIBRATE = False
@@ -70,6 +70,7 @@ class BalancingRobot:
         # self.update_angle_task = timed_task.TimedTask(delay=DELAY, run=self.update_angle_handler)
         self.control_loop_task = timed_task.TimedTask(delay=DELAY, run=self.control_loop_handler)
 
+        self.counter = 0
         # Logging data
         if LOG_DATA:
             self.data_collector = data_collector
@@ -102,8 +103,8 @@ class BalancingRobot:
             self.data = self.mpu.get_all_data()
 
         # Calculate pitch from accelerometer and gyroscope
-        # pitch_from_acceleration = degrees(atan2(self.data[0], max(1e-6,sqrt(self.data[1]**2 + self.data[2]**2))))
-        pitch_from_acceleration = degrees(atan2(self.data[0], -self.data[2]))
+        pitch_from_acceleration = degrees(atan2(self.data[0], max(1e-6,sqrt(self.data[1]**2 + self.data[2]**2))))
+        # pitch_from_acceleration = degrees(atan2(self.data[0], -self.data[2]))
         pitch_gyro_integration = self.previous_pitch + self.data[4] * dt
 
         # Filter volatile acceleration angle
@@ -115,40 +116,35 @@ class BalancingRobot:
         self.previous_pitch = pitch
         self.angle = pitch
 
-        if LOG_DATA:
-            self.data_collector.log_angle_data(pitch, pitch_gyro_integration, pitch_from_acceleration, f_accel_angle)
-            ms_since_start = (now - self.starting_time) * 1000
-            self.data_collector.log_data('timestamped_angles', [ms_since_start, float(self.angle)])
-            print(f'0: {self.data[0]:7.4f}, 1: {self.data[1]:7.4f}, 2: {self.data[2]:7.4f}, 3: {self.data[3]:7.4f}, 4: {self.data[4]:7.4f}, 5: {self.data[5]:7.4f}, Pitch: {pitch}')
-
         # Position PID
-        # avg_steps = ((robot.left_motor.get_position() + robot.right_motor.get_position())/2) / MICROSTEPS 
+        avg_steps = ((robot.left_motor.get_steps() + robot.right_motor.get_steps())/2) / MICROSTEPS 
         # revolutions = avg_steps / 200 / MICROSTEPS      # steps / 200 steps per revolution / Microstepping => Actual revolution
-        # tar_angle, pp, pi, pd = self.pos_pid.update(avg_steps, dt)
+        tar_angle, pp, pi, pd = self.pos_pid.update(avg_steps, dt)
 
         # Angle PID
-        # filtered_target_angle = self.lpf_target_angle.filter(-tar_angle)
-        # filtered_target_angle = max(-MAX_TARGET_ANGLE, min(MAX_TARGET_ANGLE, filtered_target_angle))
-        # self.angle_pid.set_setpoint(filtered_target_angle)
+        filtered_target_angle = self.lpf_target_angle.filter(-tar_angle)
+        filtered_target_angle = max(-MAX_TARGET_ANGLE, min(MAX_TARGET_ANGLE, filtered_target_angle))
+        self.angle_pid.set_setpoint(filtered_target_angle)
 
         speed, ap, ai, ad = self.angle_pid.update(self.angle, dt)
         self.target_velocity = -speed                   # Negative angle => Positive speed. Invert to drive in the right direction
-        
-        try:
-            ms_since_start = (now - self.starting_time) * 1000
-            # print(f'Ms: {ms_since_start:5.2f} | Angle: {self.angle:7.4f} | Speed: {self.target_velocity:7.4f} | Revolutions: {revolutions:7.4f} | target angle: {tar_angle:7.4f} | target angle: {filtered_target_angle:7.4f} | P: {ap:7.4f} I: {ai:7.4f} D: {ad:7.4f} | dt: {dt:7.4f}')
-            # print(f'Ms: {ms_since_start:5.2f} | Steps: {avg_steps:7.4f} | Target angle: {tar_angle:7.4f} | Angle: {self.angle:7.4f} | Speed: {self.target_velocity:7.4f}')
-        except Exception as e:
-            print(f"oops: {e}")
 
         self.left_motor.set_velocity(self.target_velocity)
         self.right_motor.set_velocity(self.target_velocity)
-        
+        self.counter += 1
         if LOG_DATA:
-            # self.data_collector.log_pid_data('pos', pp, pi, pd, tar_angle)
+            ms_since_start = (now - self.starting_time) * 1000
+            self.data_collector.log_data('timestamped_angles', [ms_since_start, float(self.angle)])
+            # print(f'0: {self.data[0]:7.4f}, 1: {self.data[1]:7.4f}, 2: {self.data[2]:7.4f}, 3: {self.data[3]:7.4f}, 4: {self.data[4]:7.4f}, 5: {self.data[5]:7.4f}, Pitch: {pitch}')
+
+            self.data_collector.log_pid_data('pos', pp, pi, pd, tar_angle)
             self.data_collector.log_pid_data('angle', ap, ai, ad, self.target_velocity)
-            # self.data_collector.log_data('steps', avg_steps)
-            # self.data_collector.log_data('target_angles', filtered_target_angle)
+            self.data_collector.log_data('steps', avg_steps)
+            self.data_collector.log_data('target_angles', filtered_target_angle)
+            self.data_collector.log_data('angle', pitch)
+            self.data_collector.log_data('accel_angle', pitch_from_acceleration)
+            self.data_collector.log_data('f_accel_angle', f_accel_angle)
+            self.data_collector.log_data('gyro_angle', pitch_gyro_integration)
 
 
 
@@ -173,7 +169,8 @@ if __name__ == "__main__":
     else:
         mpu.set_accel_offset(0.074998, -0.025541, 0.101678) # 0.045213, -0.020453, 0.103890
         mpu.set_gyro_offset(0.169651, -0.024273, -0.038918) # 0.260446, -0.063810, 0.010697
-    mpu.set_dlpf_cfg(4)
+    # mpu.set_dlpf_cfg(4)
+    mpu.optimize_sample_settings(DELAY)
 
     # ----- PID -----
     min_velocity = -100
@@ -195,9 +192,9 @@ if __name__ == "__main__":
     angle_pid = PID_Controller(ap, ai, ad, min_velocity, max_velocity, angle_setpoint, pid_alpha)
 
     # ----- Motor -----
-    stepresolution = 200 * MICROSTEPS
-    left_motor = Stepper(dir_pin=13, step_pin=19, enable_pin=12, mode_pins=(16, 17, 20), steps=stepresolution)
-    right_motor = Stepper(dir_pin=24, step_pin=18, enable_pin=4, mode_pins=(21, 22, 27), invert_direction=True, steps=stepresolution)
+    steps_per_resolution = 200 * MICROSTEPS
+    left_motor = Stepper(dir_pin=13, step_pin=19, enable_pin=12, mode_pins=(16, 17, 20), microsteps=8)
+    right_motor = Stepper(dir_pin=24, step_pin=18, enable_pin=4, mode_pins=(21, 22, 27), microsteps=8, invert_direction=True)
     if USE_MOTORS:
         left_motor.start()
         right_motor.start()
@@ -232,6 +229,7 @@ if __name__ == "__main__":
         print("Cleaning up GPIO ...")
         GPIO.cleanup()
         print("Exiting ...")
+        print(f'Counter: {robot.counter}')
 
 
     if LOG_DATA:

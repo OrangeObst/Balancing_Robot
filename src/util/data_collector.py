@@ -7,10 +7,6 @@ import numpy as np
 class DataCollector:
     def __init__(self):
         self.data = {
-            'angles': [],
-            'gyro_angles': [],
-            'accel_angles': [],
-            'f_accel_angles': [],
             'angle_pid_terms': {
                 'p_terms': [],
                 'i_terms': [],
@@ -23,9 +19,6 @@ class DataCollector:
                 'd_terms': [],
                 'output': []
             },
-            'timestamped_angles': [],
-            'steps': [],
-            'target_angles': []
         }
 
         self.pid_key_map = {
@@ -40,13 +33,6 @@ class DataCollector:
 
     def log_data(self, key, value):
         self.data.setdefault(key, []).append(value)
-
-
-    def log_angle_data(self, angle, gyro_angle, accel_angle, f_accel_angle):
-        self.data['angles'].append(angle)
-        self.data['gyro_angles'].append(gyro_angle)
-        self.data['accel_angles'].append(accel_angle)
-        self.data['f_accel_angles'].append(f_accel_angle)
 
 
     def log_pid_data(self, pid, p_terms, i_terms, d_terms, output):
@@ -84,11 +70,13 @@ class DataCollector:
             
 
 
-    def get_all_collected_data(self):
-        return self.data
+    def get_collected_data(self, var_name=None):
+        if var_name:
+            return self.data[var_name]
+        return dict(self.data)
     
 
-    def get_next_log_file_name(self, destination_folder='/home/newPi/Desktop/'):
+    def _get_next_log_file_name(self, destination_folder='/home/newPi/Desktop/'):
         # Ensure the destination folder exists
         os.makedirs(destination_folder, exist_ok=True)
         
@@ -100,7 +88,7 @@ class DataCollector:
         return os.path.join(destination_folder, f"{base_name}{i}{extension}")
     
     def write_timestamped_angles_to_csv(self, destination_folder='/home/newPi/Desktop/'):
-        filename = self.get_next_log_file_name(destination_folder)
+        filename = self._get_next_log_file_name(destination_folder)
         with open(filename, 'w', newline='') as csvfile:
             csv_writer = csv.writer(csvfile)
             csv_writer.writerow(['Milliseconds since start', 'Angle'])
@@ -110,4 +98,4 @@ class DataCollector:
 
 if __name__ == "__main__":
     collector = DataCollector()
-    print(collector.get_next_log_file_name('/home/newPi/Desktop/Balance_Bot/Stepper_Bot/Messungen'))
+    print(collector._get_next_log_file_name('/home/newPi/Desktop/Balance_Bot/Stepper_Bot/Messungen'))

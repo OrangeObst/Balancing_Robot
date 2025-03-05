@@ -41,7 +41,7 @@ class PID_Controller(object):
         # http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-derivative-kick/
         # Derivative on measurement, in case I want to change the setpoint in the future
         dterm = self.kd * ((input - self.previous_input) / dt)
-
+        # print(f'input: {input} | previous input: {self.previous_input}')
         output = pterm + iterm - dterm
 
         # self.previous_error = error
