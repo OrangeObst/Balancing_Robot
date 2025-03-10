@@ -66,6 +66,11 @@ class Stepper:
     def stop(self):
         GPIO.output(self.enable_pin, GPIO.LOW)
 
+    
+    def shutdown(self):
+        print("Cleaning up GPIO ...")
+        GPIO.cleanup()
+
 
     def get_position(self):
         return self.steps
