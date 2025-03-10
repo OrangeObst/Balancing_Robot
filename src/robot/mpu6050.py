@@ -382,8 +382,8 @@ if __name__ == "__main__":
     # mpu.calculate_gyro_drift()
     # print(mpu.GYRO_DRIFT_X, mpu.GYRO_DRIFT_Y, mpu.GYRO_DRIFT_Z)
 
-    # mpu.set_accel_offset(0.074998, -0.025541, 0.101678)
-    # mpu.set_gyro_offset(0.169651, -0.024273, -0.038918)
+    mpu.set_accel_offset(0.059397, -0.019336, 0.104918)
+    mpu.set_gyro_offset(0.180059, 0.101374, 0.241004)
 
 
 

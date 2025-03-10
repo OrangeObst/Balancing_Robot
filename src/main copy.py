@@ -9,6 +9,7 @@ from robot.stepper_motor import Stepper
 # from robot.threaded_motors import Stepper
 # from codetiming import Timer
 from time import time
+from smbus2 import SMBus
 
 # Angle PID
 AP = 17                  # 8
@@ -77,7 +78,7 @@ class BalancingRobot:
     # @Timer(name="Control loop", text="Control loop: {milliseconds:.6f}ms")
     def control_loop_handler(self, now, dt):
         """Main control loop handler"""
-        # data = self._get_all_data()
+        # other_data = self._get_all_data()
         data = self.mpu.get_all_data()
         angle, accel_angle, gyro_angle = self._calculate_angle(data, dt)
         avg_steps = self._calculate_average_steps()
@@ -198,16 +199,6 @@ class BalancingRobot:
         self.data_collector.log_pid_data('pos', pp, pi, pd, target_angle)
         self.data_collector.log_pid_data('angle', ap, ai, ad, speed)
 
-    def _get_all_data(self):
-        accel_data = mpu.get_accel_data()
-        # print(accel_data['x'])
-        # print(accel_data['y'])
-        # print(accel_data['z'])
-        gyro_data = mpu.get_gyro_data()
-        # print(gyro_data['x'])
-        # print(gyro_data['y'])
-        # print(gyro_data['z'])
-        return accel_data['x'], accel_data['y'], accel_data['y'], gyro_data['x'], gyro_data['y'], gyro_data['z']
 
     # @Timer(name="Main loop", text="Main loop: {milliseconds:.6f}ms")
     def loop(self):

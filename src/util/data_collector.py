@@ -35,6 +35,11 @@ class DataCollector:
         self.data.setdefault(key, []).append(value)
 
 
+    def log_multiple_data(self, **kwargs):
+        for key, value in kwargs.items():
+            self.data.setdefault(key, []).append(value)
+
+
     def log_pid_data(self, pid, p_terms, i_terms, d_terms, output):
         if pid not in self.pid_key_map:
             raise ValueError(f"Invalid pid: {pid}. Must be one of: {list(self.pid_key_map.keys())}")

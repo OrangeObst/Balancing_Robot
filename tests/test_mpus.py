@@ -35,6 +35,7 @@ if __name__ == "__main__":
         ax, ay, az, gx, gy, gz = get_my_data()
         print(f'Other: {oax:6.4f} {oay:6.4f} {oaz:6.4f} {ogx:6.4f} {ogy:6.4f} {ogz:6.4f}')
         print(f'Mine : {ax:6.4f} {ay:6.4f} {az:6.4f} {gx:6.4f} {gy:6.4f} {gz:6.4f}')
+        print('------------------------------')
 
     #     # data_list = mpu.get_fifo_buffer()
     #     data = mpu.get_all_data()
