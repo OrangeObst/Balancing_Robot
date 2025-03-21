@@ -1,21 +1,23 @@
 import threading
+from codetiming import Timer
 
 class ThreadedStepper(threading.Thread):
     def __init__(self, stepper_motor):
         super().__init__()
         self.stepper = stepper_motor
         self._stop_event = threading.Event()
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def run(self):
         # Your thread's main loop. You might want to constantly check for new velocity settings here.
         while not self._stop_event.is_set():
             self.stepper.loop()
 
+    @Timer(name="Set velocity", text="Set velocity: {milliseconds:.6f}ms")
     def set_velocity(self, velocity):
         # Synchronize access if set_velocity isn't thread-safe
-        # with self._lock:
-        self.stepper.set_velocity(velocity)
+        with self._lock:
+            self.stepper.set_velocity(velocity)
 
     def get_position(self):
         return self.stepper.get_position()

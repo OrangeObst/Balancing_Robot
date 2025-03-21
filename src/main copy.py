@@ -12,36 +12,48 @@ from robot.threaded_motors import ThreadedStepper
 # from codetiming import Timer
 from time import time
 from smbus2 import SMBus
+from configparser import ConfigParser
 
 # TODO: Threaded motor implementation seems to be wrong. 
-# I lose nearly 10% off of counter, motors don't turn properly and are louder than usual
+# I lose nearly 40% off of counter, motors don't turn properly and are louder than usual
 
-# Angle PID
-AP = 15                  # 8
-AI = 0.01                # 0.2
-AD = 0.15               # 0.08
-# Position PID
-PP = 0.0005               # 0.0005
-PI = 0.0                # 0.0
-PD = 0.0006                # 0.0006
+config = ConfigParser()
+config.read('/home/newPi/Desktop/Balancing_Robot/src/settings.ini')
 
-ALPHA = 0.98            # Komplementärfilter 
-DELAY = 0.01            
-SAMPLE_TIME = 0.003             # MPUaverager sample time
-TIMER = 10
-MICROSTEPS = 8
-MAX_TARGET_ANGLE = 5
-USE_MOTORS = True
-USE_THREADED_MOTORS = True
-USE_POS_PID = False
-FILTER_TARGET_ANGLE = False     # Has to be false if USE_POS_PID is False
-FILTER_ACCEL_ANGLE = False
-AVERAGE_MPU_VALUES = False
-CALIBRATE = False
-LOG_DATA = False
-WRITE_TO_CSV = False
+# Angle PID constants
+AP = config.getfloat('Angle_PID', 'AP')                 # 15
+AI = config.getfloat('Angle_PID', 'AI')                 # 0.01
+AD = config.getfloat('Angle_PID', 'AD')                 # 0.15
 
-        
+# Position PID constants
+PP = config.getfloat('Position_PID', 'PP')              # 0.0005
+PI = config.getfloat('Position_PID', 'PI')              # 0.0
+PD = config.getfloat('Position_PID', 'PD')              # 0.0006
+USE_POS_PID = config.getboolean('Position_PID', 'USE_POS_PID')                      # De-/activate position PID controller
+MAX_TARGET_ANGLE = config.getfloat('Position_PID', 'MAX_TARGET_ANGLE')              # Max output for position PID controller
+FILTER_TARGET_ANGLE = config.getboolean('Position_PID', 'FILTER_TARGET_ANGLE')      # De-/activate filtering for target angle, could reduce instability
+                                                                                    # Has to be false if USE_POS_PID is False
+
+# Time settings
+DELAY = config.getfloat('Time', 'DELAY')                                            # Updatetime delay
+TIMER = config.getfloat('Time', 'TIMER')                                            # Runtime in seconds
+
+# Motor settings
+USE_MOTORS = config.getboolean('Motor', 'USE_MOTORS')                               # De-/activate motors
+USE_THREADED_MOTORS = config.getboolean('Motor', 'USE_THREADED_MOTORS')             # Threaded motors
+MICROSTEPS = config.getfloat('Motor', 'MICROSTEPS')                                 # Stepper motor HAT microstep setting
+
+# MPU settings
+COMPLEMENTARY_ALPHA = config.getfloat('MPU', 'COMPLEMENTARY_ALPHA')                 # Complementary filter for the accelerometer and gyroscope (MPU6050)
+FILTER_ACCEL_ANGLE = config.getboolean('MPU', 'FILTER_ACCEL_ANGLE')                 # De-/activate filtering for acceleration angle, increases reaction time
+AVERAGE_MPU_VALUES = config.getboolean('MPU', 'AVERAGE_MPU_VALUES')                 # De-/activate averaging for MPU samples over SAMPLE_TIME
+SAMPLE_TIME = config.getfloat('MPU', 'SAMPLE_TIME')                                 # MPUaverager sample time => DELAY / SAMPLE_TIME
+CALIBRATE = config.getboolean('MPU', 'CALIBRATE')                                   # True: MPU calibrates before every start, False: uses hardcoded offset
+
+# Data logging
+LOG_DATA = config.getboolean('Logging', 'LOG_DATA')                                 # De-/activate data logging
+
+
 class BalancingRobot:
     def __init__(self, 
                  left_motor: Stepper, 
@@ -53,14 +65,14 @@ class BalancingRobot:
                 ):
         
         # Hardware
-        self.left_motor = left_motor                        # Stepper Motor left
-        self.right_motor = right_motor                      # Stepper Motor right
+        self.left_motor = left_motor
+        self.right_motor = right_motor
         if USE_THREADED_MOTORS:
             self.left_motor = ThreadedStepper(self.left_motor)
             self.right_motor = ThreadedStepper(self.right_motor)
-            self.left_motor.start()
-            self.right_motor.start()
-        self.mpu = mpu                                      # MPU6050
+            self.left_motor.start()     # Starts the left_motor thread
+            self.right_motor.start()    # Starts the right_motor thread
+        self.mpu = mpu
 
         if AVERAGE_MPU_VALUES:
             self.mpudata_queue = Queue()
@@ -75,7 +87,7 @@ class BalancingRobot:
         lpf_alpha = 0.4                                     # Low pass filter alpha
         self.lpf_accel_angle = LowPassFilter(lpf_alpha)     # LPF for accel angle
         self.lpf_target_angle = LowPassFilter(lpf_alpha)    # LPF for target angle
-        self.alpha = ALPHA                                  # Complementary filter alpha
+        self.alpha = COMPLEMENTARY_ALPHA                    # Complementary filter alpha
 
         # Timed Tasks for static execution times
         # MPU6050 data update frequency depends on dlpf
@@ -100,6 +112,7 @@ class BalancingRobot:
             data = self.mpudata_queue.get_nowait()
         else:
             data = self.mpu.get_all_data()
+            # TODO: compare values with all negative values and see what happens
     
         angle, accel_angle, gyro_angle = self._calculate_angle(data, dt)
         avg_steps = self._calculate_average_steps()
@@ -114,6 +127,7 @@ class BalancingRobot:
         speed, ap, ai, ad = self._update_angle_pid(angle_pid_setpoint, angle, dt)
         self._apply_motor_controls(speed)
         self.counter += 1
+        # print(f'Angle: {angle:7.4f} | Speed: {speed:7.4f} | T_angle: {target_angle:7.4f}')
 
         if LOG_DATA:
             self._log_data(data, now, angle, accel_angle, gyro_angle, pp, pi, pd, target_angle, ap, ai, ad, speed, avg_steps)
@@ -151,6 +165,7 @@ class BalancingRobot:
                 self.data_collector.log_data('f_accel_angle', accel_angle)
         angle = self.alpha * gyro_angle + (1 - self.alpha) * accel_angle
         self.previous_angle = angle
+        print(accel_angle, gyro_angle, angle, )
         return angle
 
 
@@ -219,8 +234,6 @@ class BalancingRobot:
 
     # @Timer(name="Main loop", text="Main loop: {milliseconds:.6f}ms")
     def loop(self):
-        # self.collect_data_task.loop()
-        # self.update_angle_task.loop()
         self.control_loop_task.loop()
 
         if USE_MOTORS and not USE_THREADED_MOTORS:
@@ -237,8 +250,8 @@ if __name__ == "__main__":
     if CALIBRATE:
         mpu.calibrate_sensor(2)
     else:
-        mpu.set_accel_offset(0.059397, -0.019336, 0.104918)
-        mpu.set_gyro_offset(0.180059, 0.101374, 0.241004)
+        mpu.set_accel_offset(0.057006, -0.017987, 0.121464)
+        mpu.set_gyro_offset(0.121146, 0.170536, 0.156532)
 
     sample_time = SAMPLE_TIME if AVERAGE_MPU_VALUES else DELAY
     mpu.optimize_sample_settings(sample_time)

@@ -372,28 +372,28 @@ if __name__ == "__main__":
     bus = SMBus(1)
     mpu = MyMPU6050(bus)
 
-    # mpu.calibrate_sensor(5)
+    mpu.calibrate_sensor(5)
 
     # mpu.reset_fifo()
     # mpu.enable_fifo_reg()
     # mpu.configure_fifo_reg()
     # mpu.set_dlpf_cfg(0x2
-    mpu.optimize_sample_settings(dt)
+    # mpu.optimize_sample_settings(dt)
     # mpu.calculate_gyro_drift()
     # print(mpu.GYRO_DRIFT_X, mpu.GYRO_DRIFT_Y, mpu.GYRO_DRIFT_Z)
 
-    mpu.set_accel_offset(0.059397, -0.019336, 0.104918)
-    mpu.set_gyro_offset(0.180059, 0.101374, 0.241004)
+    # mpu.set_accel_offset(0.059397, -0.019336, 0.104918)
+    # mpu.set_gyro_offset(0.180059, 0.101374, 0.241004)
 
 
 
     # from math import atan2, sqrt, degrees
     
-    while ((time.time() - timer) < 10):
-        loop_start = time.time()
+    # while ((time.time() - timer) < 5):
+    #     loop_start = time.time()
     #     # data_list = mpu.get_fifo_buffer()
     #     data = mpu.get_all_data()
-        print(mpu.get_raw_data())
+        # print(mpu.get_raw_data())
     #     # if data_list is not None:
     #         # for data in data_list:
     #     pitch_from_acceleration = degrees(atan2(data[0], -data[2]))
@@ -403,10 +403,10 @@ if __name__ == "__main__":
     #     counter += 1
     #     print(f'0: {data[0]:8.4f}, 1: {data[1]:8.4f}, 2: {data[2]:8.4f}, 3: {data[3]:8.4f}, 4: {data[4]:8.4f}, 5: {data[5]:8.4f}, Pitch: {previous_pitch:6.4f}')
         
-        loop_end = time.time()
-        loop_duration = loop_end - loop_start
+        # loop_end = time.time()
+        # loop_duration = loop_end - loop_start
 
-        sleep_time = max(0, dt - loop_duration)
-        time.sleep(sleep_time)
+        # sleep_time = max(0, dt - loop_duration)
+        # time.sleep(sleep_time)
 
     # print(counter)

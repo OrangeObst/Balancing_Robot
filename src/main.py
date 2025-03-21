@@ -1,72 +1,86 @@
-import RPi.GPIO as GPIO
 from math import degrees, atan2, sqrt
-from smbus2 import SMBus
+from robot.robot import BalancingRobot
+from util.data_collector import DataCollector
+from util import plot_graphs
 from robot.mpu6050 import MyMPU6050
 from robot.pid_controller import PID_Controller
 from robot.stepper_motor import Stepper
-from robot.robot import BalancingRobot
-# from robot.threaded_motors import Stepper
-# from robot.mpu6050_copy import MyMPU6050
-from util.data_collector import DataCollector
-from util import timed_task, plot_graphs
-from util.lowpassfilter import LowPassFilter
 # from codetiming import Timer
 from time import time
+from smbus2 import SMBus
+from configparser import ConfigParser
 
-# Angle PID
-AP = 17                  # 8
-AI = 0.01                # 0.2
-AD = 0.00               # 0.08
-# Position PID
-PP = 0.0005               # 0.0005
-PI = 0.0                # 0.0
-PD = 0.0006                # 0.0006
+# TODO: Threaded motor implementation seems to be wrong. 
+# I lose nearly 10% off of counter, motors don't turn properly and are louder than usual
 
-ALPHA = 0.98            # Komplementärfilter 
-DELAY = 0.01            
-TIMER = 10
-MICROSTEPS = 8
-MAX_TARGET_ANGLE = 5
-USE_MOTORS = True
-USE_POS_PID = False
-FILTER_TARGET_ANGLE = False  # Has to be false if USE_POS_PID is False
-FILTER_ACCEL_ANGLE = True
-REMOTE = False
-AVERAGED = False
-CALIBRATE = False
-LOG_DATA = True
-WRITE_TO_CSV = False
+config = ConfigParser()
+config.read('/home/newPi/Desktop/Balancing_Robot/src/settings.ini')
+
+# Angle PID constants
+AP = config.getfloat('Angle_PID', 'AP')                 # 15
+AI = config.getfloat('Angle_PID', 'AI')                 # 0.01
+AD = config.getfloat('Angle_PID', 'AD')                 # 0.15
+
+# Position PID constants
+PP = config.getfloat('Position_PID', 'PP')              # 0.0005
+PI = config.getfloat('Position_PID', 'PI')              # 0.0
+PD = config.getfloat('Position_PID', 'PD')              # 0.0006
+USE_POS_PID = config.getboolean('Position_PID', 'USE_POS_PID')                      # De-/activate position PID controller
+MAX_TARGET_ANGLE = config.getfloat('Position_PID', 'MAX_TARGET_ANGLE')              # Max output for position PID controller
+FILTER_TARGET_ANGLE = config.getboolean('Position_PID', 'FILTER_TARGET_ANGLE')      # De-/activate filtering for target angle, could reduce instability
+                                                                                    # Has to be false if USE_POS_PID is False
+
+# Time settings
+DELAY = config.getfloat('Time', 'DELAY')                                            # Updatetime delay
+TIMER = config.getfloat('Time', 'TIMER')                                            # Runtime in seconds
+
+# Motor settings
+USE_MOTORS = config.getboolean('Motor', 'USE_MOTORS')                               # De-/activate motors
+USE_THREADED_MOTORS = config.getboolean('Motor', 'USE_THREADED_MOTORS')             # Threaded motors
+MICROSTEPS = config.getfloat('Motor', 'MICROSTEPS')                                 # Stepper motor HAT microstep setting
+
+# MPU settings
+COMPLEMENTARY_ALPHA = config.getfloat('MPU', 'COMPLEMENTARY_ALPHA')                 # Complementary filter for the accelerometer and gyroscope (MPU6050)
+FILTER_ACCEL_ANGLE = config.getboolean('MPU', 'FILTER_ACCEL_ANGLE')                 # De-/activate filtering for acceleration angle, increases reaction time
+AVERAGE_MPU_VALUES = config.getboolean('MPU', 'AVERAGE_MPU_VALUES')                 # De-/activate averaging for MPU samples over SAMPLE_TIME
+SAMPLE_TIME = config.getfloat('MPU', 'SAMPLE_TIME')                                 # MPUaverager sample time => DELAY / SAMPLE_TIME
+CALIBRATE = config.getboolean('MPU', 'CALIBRATE')                                   # True: MPU calibrates before every start, False: uses hardcoded offset
+
+# Data logging
+LOG_DATA = config.getboolean('Logging', 'LOG_DATA')                                 # De-/activate data logging
 
 if __name__ == "__main__":
 
     # ----- MPU -----
     bus = SMBus(1)
-    # mpu = MyMPU6050(0x68)
     mpu = MyMPU6050(bus)
     if CALIBRATE:
         mpu.calibrate_sensor(2)
     else:
-        mpu.set_accel_offset(0.059397, -0.019336, 0.104918) # 0.074998, -0.025541, 0.101678
-        mpu.set_gyro_offset(0.180059, 0.101374, 0.241004) # 0.169651, -0.024273, -0.038918
+        mpu.set_accel_offset(0.059397, -0.019336, 0.104918)
+        mpu.set_gyro_offset(0.180059, 0.101374, 0.241004)
 
-    # mpu.optimize_sample_settings(DELAY)
+    sample_time = SAMPLE_TIME if AVERAGE_MPU_VALUES else DELAY
+    mpu.optimize_sample_settings(sample_time)
 
     # ----- PID -----
-    MAX_VELOCITY = 100
+    min_velocity = -100
+    max_velocity = 100
     angle_setpoint = 0.0
     ap = AP
     ai = AI
     ad = AD
     position_setpoint = 0.0
-    MAX_TARGET_ANGLE = 25.0
+    min_angle = -25.0
+    max_angle = 25.0
     pid_alpha = 0.5
     pp = PP
     pi = PI
     pd = PD
     delay = DELAY
 
-    pos_pid = PID_Controller(pp, pi, pd, -MAX_TARGET_ANGLE, MAX_TARGET_ANGLE, position_setpoint, pid_alpha)
-    angle_pid = PID_Controller(ap, ai, ad, -MAX_VELOCITY, MAX_VELOCITY, angle_setpoint, pid_alpha)
+    pos_pid = PID_Controller(pp, pi, pd, min_angle, max_angle, position_setpoint, pid_alpha)
+    angle_pid = PID_Controller(ap, ai, ad, min_velocity, max_velocity, angle_setpoint, pid_alpha)
 
     # ----- Motor -----
     spr = 200 * MICROSTEPS
@@ -102,8 +116,8 @@ if __name__ == "__main__":
     finally:
         if USE_MOTORS:
             print("Stopping Motors ...")
-            left_motor.shutdown()
-            right_motor.shutdown()
+            robot.shutdown()
+        
         print("Exiting ...")
         print(f'Counter: {robot.counter}')
 
@@ -125,14 +139,14 @@ if __name__ == "__main__":
         # DataCollector.print_averages()
 
 
-        plotter = plot_graphs.Plotter(angle_pid_const, pos_pid_const, TIMER)
-        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle'], 'Target angle': collected_data['pos_pid_terms']['output']}, 'Steps', {'Steps': collected_data['steps']})
-        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle']}, 'Speed', {'Speed': collected_data['angle_pid_terms']['output']}, name='Angle_to_Speed')        
-        plotter.plot_measurements('Accel', {'ax': collected_data['ax'], 'ay': collected_data['ay'], 'az': collected_data['az']}, name="Accel_Data")
-        plotter.plot_measurements('Gyro', {'gx': collected_data['gx'], 'gy': collected_data['gy'], 'gz': collected_data['gz']}, name="Gyro_Data")
+        plotter = plot_graphs.Plotter(angle_pid_const, pos_pid_const)
+        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle'], 'Target angle': collected_data['pos_pid_terms']['output']}, TIMER, 'Steps', {'Steps': collected_data['steps']})
+        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle']}, TIMER, 'Speed', {'Speed': collected_data['angle_pid_terms']['output']}, name='Angle_to_Speed')        
+        plotter.plot_measurements('Accel', {'ax': collected_data['ax'], 'ay': collected_data['ay'], 'az': collected_data['az']}, TIMER, name="Accel_Data")
+        plotter.plot_measurements('Gyro', {'gx': collected_data['gx'], 'gy': collected_data['gy'], 'gz': collected_data['gz']}, TIMER, name="Gyro_Data")
 
-        plotter.subplot_p_i_d_values('Angle', collected_data['angle_pid_terms'], 100, 'PID_Terms')
-        plotter.subplot_p_i_d_values('Position', collected_data['pos_pid_terms'], 100, 'PID_Terms')
+        plotter.subplot_p_i_d_values('Angle', collected_data['angle_pid_terms'], TIMER, 100, 'PID_Terms')
+        plotter.subplot_p_i_d_values('Position', collected_data['pos_pid_terms'], TIMER, 100, 'PID_Terms')
         
-        plotter.plot_angles([[collected_data['angle'],'Robot angle'], [collected_data['pos_pid_terms']['output'],'Target angle']], name='Angle_to_target_angle')
+        plotter.plot_angles([[collected_data['angle'],'Robot angle'], [collected_data['pos_pid_terms']['output'],'Target angle']], TIMER,  name='Angle_to_target_angle')
         # plotter.plot_angles([[collected_data['accel_angles'],'Winkel aus Beschleunigungsdaten'], [collected_data['f_accel_angles'], 'Gefilterter Winkel'], [collected_data['gyro_angles'],'Winkel aus Gyroskopdaten']])
