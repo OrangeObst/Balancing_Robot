@@ -33,4 +33,4 @@ angle_pid_const = [AP, AI, AD]
 pos_pid_const = [PP, PI, PD]
 
 plotter = Plotter(angle_pid_const, pos_pid_const)
-plotter.subplot_p_i_d_values('Angle', {'p_terms': p_terms, 'i_terms': i_terms, 'd_terms': d_terms, 'output': output}, timer, 100, 'PID_Terms')
+plotter.subplot_p_i_d_values('Angle', {'p_terms': p_terms, 'i_terms': i_terms, 'd_terms': d_terms, 'output': output}, timer, 100, 'Testing_plotter')

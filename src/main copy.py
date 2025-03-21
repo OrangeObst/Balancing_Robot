@@ -1,4 +1,5 @@
 from math import degrees, atan2, sqrt
+from queue import Queue
 from util.data_collector import DataCollector
 from util import timed_task, plot_graphs
 from robot.mpu6050 import MyMPU6050
@@ -6,15 +7,19 @@ from robot.mpu6050 import MyMPU6050
 from util.lowpassfilter import LowPassFilter
 from robot.pid_controller import PID_Controller
 from robot.stepper_motor import Stepper
-# from robot.threaded_motors import Stepper
+from robot.MpuDataAverager import MpuDataAverager
+from robot.threaded_motors import ThreadedStepper
 # from codetiming import Timer
 from time import time
 from smbus2 import SMBus
 
+# TODO: Threaded motor implementation seems to be wrong. 
+# I lose nearly 10% off of counter, motors don't turn properly and are louder than usual
+
 # Angle PID
-AP = 17                  # 8
+AP = 15                  # 8
 AI = 0.01                # 0.2
-AD = 0.00               # 0.08
+AD = 0.15               # 0.08
 # Position PID
 PP = 0.0005               # 0.0005
 PI = 0.0                # 0.0
@@ -22,17 +27,18 @@ PD = 0.0006                # 0.0006
 
 ALPHA = 0.98            # Komplementärfilter 
 DELAY = 0.01            
+SAMPLE_TIME = 0.003             # MPUaverager sample time
 TIMER = 10
 MICROSTEPS = 8
 MAX_TARGET_ANGLE = 5
 USE_MOTORS = True
+USE_THREADED_MOTORS = True
 USE_POS_PID = False
-FILTER_TARGET_ANGLE = False  # Has to be false if USE_POS_PID is False
-FILTER_ACCEL_ANGLE = True
-REMOTE = False
-AVERAGED = False
+FILTER_TARGET_ANGLE = False     # Has to be false if USE_POS_PID is False
+FILTER_ACCEL_ANGLE = False
+AVERAGE_MPU_VALUES = False
 CALIBRATE = False
-LOG_DATA = True
+LOG_DATA = False
 WRITE_TO_CSV = False
 
         
@@ -49,14 +55,24 @@ class BalancingRobot:
         # Hardware
         self.left_motor = left_motor                        # Stepper Motor left
         self.right_motor = right_motor                      # Stepper Motor right
+        if USE_THREADED_MOTORS:
+            self.left_motor = ThreadedStepper(self.left_motor)
+            self.right_motor = ThreadedStepper(self.right_motor)
+            self.left_motor.start()
+            self.right_motor.start()
         self.mpu = mpu                                      # MPU6050
+
+        if AVERAGE_MPU_VALUES:
+            self.mpudata_queue = Queue()
+            self.mpudata_averager = MpuDataAverager(self.mpu, self.mpudata_queue, SAMPLE_TIME)
+            self.mpudata_averager.start()
 
         # PIDs
         self.pos_pid = pid1                                 # Unfiltered Position PID
         self.angle_pid = pid2                               # Unfiltered Angle PID
 
         # Filters
-        lpf_alpha = 0.2                                     # Low pass filter alpha
+        lpf_alpha = 0.4                                     # Low pass filter alpha
         self.lpf_accel_angle = LowPassFilter(lpf_alpha)     # LPF for accel angle
         self.lpf_target_angle = LowPassFilter(lpf_alpha)    # LPF for target angle
         self.alpha = ALPHA                                  # Complementary filter alpha
@@ -78,8 +94,13 @@ class BalancingRobot:
     # @Timer(name="Control loop", text="Control loop: {milliseconds:.6f}ms")
     def control_loop_handler(self, now, dt):
         """Main control loop handler"""
-        # other_data = self._get_all_data()
-        data = self.mpu.get_all_data()
+        if AVERAGE_MPU_VALUES:
+            while self.mpudata_queue.empty():
+                pass
+            data = self.mpudata_queue.get_nowait()
+        else:
+            data = self.mpu.get_all_data()
+    
         angle, accel_angle, gyro_angle = self._calculate_angle(data, dt)
         avg_steps = self._calculate_average_steps()
         if USE_POS_PID:
@@ -97,7 +118,7 @@ class BalancingRobot:
         if LOG_DATA:
             self._log_data(data, now, angle, accel_angle, gyro_angle, pp, pi, pd, target_angle, ap, ai, ad, speed, avg_steps)
             # print(f'0: {data[0]:7.4f}, 1: {data[1]:7.4f}, 2: {data[2]:7.4f}, 3: {data[3]:7.4f}, 4: {data[4]:7.4f}, 5: {data[5]:7.4f}, Angle: {angle}')
-            print(f'Angle: {angle:6.4f} | Speed: {speed:6.4f} | T_angle: {target_angle:6.4f}')
+            # print(f'Angle: {angle:7.4f} | Speed: {speed:7.4f} | T_angle: {target_angle:7.4f}')
             # print(f'gx: {data[3]:6.4f} | gy: {data[4]:6.4f} | gz: {data[5]:6.4f} | Angle: {angle:6.4f}')
     
     
@@ -111,8 +132,8 @@ class BalancingRobot:
 
     def _acceleration_angle(self, data):
         """Calculate angle from accelerometer data"""
-        # accel_angle = degrees(atan2(data[0], max(1e-6,sqrt(data[1]**2 + data[2]**2))))
-        accel_angle = degrees(atan2(data[0], -data[2]))
+        accel_angle = degrees(atan2(data[0], max(1e-6,sqrt(data[1]**2 + data[2]**2))))
+        # accel_angle = degrees(atan2(data[0], -data[2]))
         return accel_angle
 
 
@@ -155,18 +176,9 @@ class BalancingRobot:
         self.angle_pid.set_setpoint(target_angle)
         speed, p_term, i_term, d_term = self.angle_pid.update(angle, dt)
         
-        # Negate speed for directional consistency in the control system
+        # Negate speed to get positive angle -> positive speed
         negated_speed = -speed  
-        
-        # Conditionally return 0 speed if within specific angle tracking scenarios
-        # if ((target_angle > 0 and angle > 0 and target_angle > angle) or 
-        #     (target_angle < 0 and angle < 0 and target_angle < angle)):
-        #     # Logic to not update speed in these scenarios; return 0.0 for speed
-        #     return self.previous_speed, p_term, i_term, d_term
-        # else:
-            # self.previous_speed = negated_speed
         return negated_speed, p_term, i_term, d_term
-
 
 
     def _filter_target_angle(self, target_angle):
@@ -181,6 +193,11 @@ class BalancingRobot:
         """Set motor velocities based on the calculated target velocity"""
         self.left_motor.set_velocity(speed)
         self.right_motor.set_velocity(speed)
+
+
+    def shutdown(self):
+        self.left_motor.shutdown()
+        self.right_motor.shutdown()
 
 
     def _log_data(self, data, timestamp, angle, accel_angle, gyro_angle, pp, pi, pd, target_angle, ap, ai, ad, speed, steps):
@@ -206,7 +223,7 @@ class BalancingRobot:
         # self.update_angle_task.loop()
         self.control_loop_task.loop()
 
-        if USE_MOTORS:
+        if USE_MOTORS and not USE_THREADED_MOTORS:
             self.left_motor.loop()
             self.right_motor.loop()
 
@@ -220,10 +237,11 @@ if __name__ == "__main__":
     if CALIBRATE:
         mpu.calibrate_sensor(2)
     else:
-        mpu.set_accel_offset(0.059397, -0.019336, 0.104918) # 0.074998, -0.025541, 0.101678
-        mpu.set_gyro_offset(0.180059, 0.101374, 0.241004) # 0.169651, -0.024273, -0.038918
+        mpu.set_accel_offset(0.059397, -0.019336, 0.104918)
+        mpu.set_gyro_offset(0.180059, 0.101374, 0.241004)
 
-    # mpu.optimize_sample_settings(DELAY)
+    sample_time = SAMPLE_TIME if AVERAGE_MPU_VALUES else DELAY
+    mpu.optimize_sample_settings(sample_time)
 
     # ----- PID -----
     min_velocity = -100
@@ -278,8 +296,7 @@ if __name__ == "__main__":
     finally:
         if USE_MOTORS:
             print("Stopping Motors ...")
-            left_motor.shutdown()
-            right_motor.shutdown()
+            robot.shutdown()
         
         print("Exiting ...")
         print(f'Counter: {robot.counter}')
@@ -302,14 +319,14 @@ if __name__ == "__main__":
         # DataCollector.print_averages()
 
 
-        plotter = plot_graphs.Plotter(angle_pid_const, pos_pid_const, TIMER)
-        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle'], 'Target angle': collected_data['pos_pid_terms']['output']}, 'Steps', {'Steps': collected_data['steps']})
-        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle']}, 'Speed', {'Speed': collected_data['angle_pid_terms']['output']}, name='Angle_to_Speed')        
-        plotter.plot_measurements('Accel', {'ax': collected_data['ax'], 'ay': collected_data['ay'], 'az': collected_data['az']}, name="Accel_Data")
-        plotter.plot_measurements('Gyro', {'gx': collected_data['gx'], 'gy': collected_data['gy'], 'gz': collected_data['gz']}, name="Gyro_Data")
+        plotter = plot_graphs.Plotter(angle_pid_const, pos_pid_const)
+        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle'], 'Target angle': collected_data['pos_pid_terms']['output']}, TIMER, 'Steps', {'Steps': collected_data['steps']})
+        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle']}, TIMER, 'Speed', {'Speed': collected_data['angle_pid_terms']['output']}, name='Angle_to_Speed')        
+        plotter.plot_measurements('Accel', {'ax': collected_data['ax'], 'ay': collected_data['ay'], 'az': collected_data['az']}, TIMER, name="Accel_Data")
+        plotter.plot_measurements('Gyro', {'gx': collected_data['gx'], 'gy': collected_data['gy'], 'gz': collected_data['gz']}, TIMER, name="Gyro_Data")
 
-        plotter.subplot_p_i_d_values('Angle', collected_data['angle_pid_terms'], 100, 'PID_Terms')
-        plotter.subplot_p_i_d_values('Position', collected_data['pos_pid_terms'], 100, 'PID_Terms')
+        plotter.subplot_p_i_d_values('Angle', collected_data['angle_pid_terms'], TIMER, 100, 'PID_Terms')
+        plotter.subplot_p_i_d_values('Position', collected_data['pos_pid_terms'], TIMER, 100, 'PID_Terms')
         
-        plotter.plot_angles([[collected_data['angle'],'Robot angle'], [collected_data['pos_pid_terms']['output'],'Target angle']], name='Angle_to_target_angle')
+        plotter.plot_angles([[collected_data['angle'],'Robot angle'], [collected_data['pos_pid_terms']['output'],'Target angle']], TIMER,  name='Angle_to_target_angle')
         # plotter.plot_angles([[collected_data['accel_angles'],'Winkel aus Beschleunigungsdaten'], [collected_data['f_accel_angles'], 'Gefilterter Winkel'], [collected_data['gyro_angles'],'Winkel aus Gyroskopdaten']])
