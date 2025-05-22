@@ -95,19 +95,3 @@ This project showcases a self-balancing robot designed to demonstrate stability 
 
 	+ **Outsource Control Logic**: Control algorithm shall be outsourced to another computer and communicate via  a network protocol (UDP, RTPS, Fast-DDS .. )
 
-
-<!-- ## Contributing & Feedback
----------------------------
-
-Contributions are welcome! Please submit a pull request for any enhancements or fixes. For feedback, questions, or suggestions, open an issue or reach out to [Your Email/Contact Info].
-
-## License
--------
-
-This project is licensed under the [MIT/Apache/Your Choice] License - see the `LICENSE.md` file for details.
-
-## Acknowledgments
-----------------
-
-* Special thanks to [Mentor/Inspiration/Resource] for [contribution/guidance]
-* Built upon the foundations of [open-source project/inspiration, if applicable] -->

@@ -19,11 +19,18 @@ class DataCollector:
                 'd_terms': [],
                 'output': []
             },
+            'speed_pid_terms': {
+                'p_terms': [],
+                'i_terms': [],
+                'd_terms': [],
+                'output': []
+            }
         }
 
         self.pid_key_map = {
-            'angle': 'angle_pid_terms',
-            'pos': 'pos_pid_terms'
+            'angle':    'angle_pid_terms',
+            'pos':      'pos_pid_terms',
+            'speed':    'speed_pid_terms'
         }
 
 

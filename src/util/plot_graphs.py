@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 class Plotter:
-    def __init__(self, apid, ppid):
+    def __init__(self, apid, ppid, spid):
         """
         Initialize the Plotter with PID constants for angle and position.
 
@@ -11,7 +11,8 @@ class Plotter:
         """
         self.pid_constants = {
             'Angle': {'P': apid[0], 'I': apid[1], 'D': apid[2]},
-            'Position': {'P': ppid[0], 'I': ppid[1], 'D': ppid[2]}
+            'Position': {'P': ppid[0], 'I': ppid[1], 'D': ppid[2]},
+            'Speed': {'P': spid[0], 'I': spid[1], 'D': spid[2]}
         }
         self.title = f"(AP={apid[0]}, AI={apid[1]}, AD={apid[2]}, PP={ppid[0]}, PI={ppid[1]}, PD={ppid[2]})"
         self.color_cycle = plt.cm.tab20.colors
@@ -42,7 +43,8 @@ class Plotter:
         except Exception as e:
             print(f"Error in stackplot_pid_values: {e}")
 
-    def subplot_p_i_d_values(self, pid_type, pid_terms, timer, data_range_percentile=99, name="PID_subplot"):
+    def subplot_p_i_d_values(self, pid_type, pid_terms, timer, data_range_percentile=99, 
+                          unified_y_limit=True, name="PID_subplot"):
         """
         Create subplots for P, I, and D values.
 
@@ -50,33 +52,57 @@ class Plotter:
         :param pid_terms: Dictionary containing PID terms (pterms, iterms, dterms)
         :param timer: Duration for the x-axis
         :param data_range_percentile: Percentile to determine Y-axis limits (symmetrical around zero)
+        :param unified_y_limit: Boolean to control y-limit behavior
+            - True: Use a global max for all subplots
+            - False: Use individual local max for each subplot
         :param name: Name for the saved plot file
         """
-        try:
-            fig, plts = plt.subplots(2, 2, figsize=(12, 10))
-            plts = [plts] if not isinstance(plts, np.ndarray) else plts
-            plot_indices = [(0, 0), (0, 1), (1, 0), (1, 1)]
+        # try:
+        fig, plts = plt.subplots(2, 2, figsize=(12, 10))
+        plts = [plts] if not isinstance(plts, np.ndarray) else plts
+        plot_indices = [(0, 0), (0, 1), (1, 0), (1, 1)]
 
+        if unified_y_limit:
+            # Calculate global max/min for all subplots
             all_values = [val for _, values in pid_terms.items() for val in values]
             lower_lim = np.percentile(all_values, (100 - data_range_percentile) / 2)
             upper_lim = np.percentile(all_values, 100 - (100 - data_range_percentile) / 2)
-            y_lim = max(abs(lower_lim), abs(upper_lim))
+            global_y_lim = max(abs(lower_lim), abs(upper_lim))
 
+            # Apply global y-limit to all subplots
             for (i, j), (label, values) in zip(plot_indices, pid_terms.items()):
                 plts[i, j].set_xlim(0, timer)
-                plts[i, j].set_ylim(-y_lim, y_lim)
-                x = np.linspace(0, timer, len(values))
-                plts[i, j].plot(x, values)
-                plts[i, j].grid(alpha=0.5)
-                plts[i, j].axhline(0, color='black', lw=0.5, linestyle='--')
-                pid_constant_label = label[:1].upper()
-                pid_constant_value = self.pid_constants[pid_type].get(pid_constant_label, '')
-                plts[i, j].set_title(f'{pid_type} {label.capitalize()} ({pid_constant_label} = {pid_constant_value})')
+                plts[i, j].set_ylim(-global_y_lim, global_y_lim)
 
-            plt.tight_layout()
-            plt.savefig(f'graphs/{pid_type}_{name}.png')
-        except Exception as e:
-            print(f"Error in subplot_p_i_d_values: {e}")
+        else:
+            # Calculate and apply individual local max/min for each subplot
+            for (i, j), (label, values) in zip(plot_indices, pid_terms.items()):
+                plts[i, j].set_xlim(0, timer)
+                lower_lim = np.percentile(values, (100 - data_range_percentile) / 2)
+                upper_lim = np.percentile(values, 100 - (100 - data_range_percentile) / 2)
+                local_y_lim = max(abs(lower_lim), abs(upper_lim))
+                if local_y_lim > 0:
+                    plts[i, j].set_ylim(-local_y_lim, local_y_lim)
+                else:
+                    pass
+
+        for (i, j), (label, values) in zip(plot_indices, pid_terms.items()):
+            x = np.linspace(0, timer, len(values))
+            plts[i, j].plot(x, values)
+            plts[i, j].grid(alpha=0.5)
+            plts[i, j].axhline(0, color='black', lw=0.5, linestyle='--')
+            pid_constant_label = label[:1].upper()
+            pid_constant_value = self.pid_constants[pid_type].get(pid_constant_label, '')
+            if pid_constant_label!= 'O':
+                plts[i, j].set_title(f'{pid_type} {label.capitalize()} ({pid_constant_label} = {pid_constant_value})')
+            else:
+                plts[i, j].set_title(f'{pid_type} {label.capitalize()} (O = P+I-D)')
+
+        plt.tight_layout()
+        plt.savefig(f'graphs/{pid_type}_{name}.png')
+        # except Exception as e:
+        #     print(f"Error in subplot_p_i_d_values: {e}")
+
 
     def plot_measurements(self, left_axis_key, left_axis_values, timer, right_axis_key=None, right_axis_values=None, name="Measurement_Plot"):
         """
@@ -126,6 +152,7 @@ class Plotter:
 
             fig.legend(loc='upper right', ncol=2)
             left_ax.axhline(y=0.0, linestyle='--')
+            plt.grid(alpha=0.5)
             plt.savefig(f'graphs/{name}')
         except Exception as e:
             print(f"Error in plot_measurements: {e}")

@@ -1,27 +1,38 @@
 from configparser import ConfigParser
 from math import degrees, atan2, sqrt
-from queue import Queue
-from util import timed_task
-from util.lowpassfilter import LowPassFilter
-from robot.MpuDataAverager import MpuDataAverager
+# from queue import Queue
+
+import numpy as np
+# from robot.MPU.MpuDataAverager import MpuDataAverager
 from robot.threaded_motors import ThreadedStepper
+from util.timed_task import TimedTask
+from util.lowpassfilter import LowPassFilter
 from time import time
+from codetiming import Timer
+
+from util.udp_client import UdpClient
 
 config = ConfigParser()
 config.read('/home/newPi/Desktop/Balancing_Robot/src/settings.ini')
 
 # Angle PID constants
-AP = config.getfloat('Angle_PID', 'AP')                 # 15
-AI = config.getfloat('Angle_PID', 'AI')                 # 0.01
-AD = config.getfloat('Angle_PID', 'AD')                 # 0.15
+AP = config.getfloat('Angle_PID', 'AP')
+AI = config.getfloat('Angle_PID', 'AI')
+AD = config.getfloat('Angle_PID', 'AD')
 
 # Position PID constants
-PP = config.getfloat('Position_PID', 'PP')              # 0.0005
-PI = config.getfloat('Position_PID', 'PI')              # 0.0
-PD = config.getfloat('Position_PID', 'PD')              # 0.0006
+PP = config.getfloat('Position_PID', 'PP')
+PI = config.getfloat('Position_PID', 'PI')
+PD = config.getfloat('Position_PID', 'PD')
 USE_POS_PID = config.getboolean('Position_PID', 'USE_POS_PID')                      # De-/activate position PID controller
 MAX_TARGET_ANGLE = config.getfloat('Position_PID', 'MAX_TARGET_ANGLE')              # Max output for position PID controller
 FILTER_TARGET_ANGLE = config.getboolean('Position_PID', 'FILTER_TARGET_ANGLE')      # De-/activate filtering for target angle, could reduce instability
+
+# Speed PID constants
+SP = config.getfloat('Speed_PID', 'SP')
+SI = config.getfloat('Speed_PID', 'SI')
+SD = config.getfloat('Speed_PID', 'SD')
+USE_SPEED_PID = config.getboolean('Speed_PID', 'USE_SPEED_PID')
 
 # Time settings
 DELAY = config.getfloat('Time', 'DELAY')                                            # Updatetime delay
@@ -42,7 +53,10 @@ CALIBRATE = config.getboolean('MPU', 'CALIBRATE')                               
 # Data logging
 LOG_DATA = config.getboolean('Logging', 'LOG_DATA')                                 # De-/activate data logging
 
-        
+# Communication
+BROKER = config.get('Communication', 'BROKER')
+PORT = config.getint('Communication', 'PORT')
+
 class BalancingRobot:
     def __init__(self, 
                  left_motor,                # : Stepper
@@ -50,6 +64,7 @@ class BalancingRobot:
                  mpu,                       # : MyMPU6050 
                  pid1,                      # : PID_Controller 
                  pid2,                      # : PID_Controller
+                 pid3,                      # : PID_Controller
                  data_collector             # : DataCollector
                 ):
         
@@ -63,29 +78,40 @@ class BalancingRobot:
             self.right_motor.start()
         self.mpu = mpu                                      # MPU6050
 
-        if AVERAGE_MPU_VALUES:
-            self.mpudata_queue = Queue()
-            self.mpudata_averager = MpuDataAverager(self.mpu, self.mpudata_queue, SAMPLE_TIME)
-            self.mpudata_averager.start()
-
         # PIDs
-        self.pos_pid = pid1                                 # Unfiltered Position PID
-        self.angle_pid = pid2                               # Unfiltered Angle PID
+        self.pos_pid = pid1                                 # Position PID
+        self.angle_pid = pid2                               # Angle PID
+        self.speed_pid = pid3                               # Speed PID
 
         # Filters
-        lpf_alpha = 0.4                                     # Low pass filter alpha
+        lpf_alpha = 0.8                                     # Low pass filter alpha
         self.lpf_accel_angle = LowPassFilter(lpf_alpha)     # LPF for accel angle
         self.lpf_target_angle = LowPassFilter(lpf_alpha)    # LPF for target angle
         self.alpha = COMPLEMENTARY_ALPHA                                  # Complementary filter alpha
 
         # Timed Tasks for static execution times
-        # MPU6050 data update frequency depends on dlpf
-        # self.update_angle_task = timed_task.TimedTask(delay=DELAY, run=self.update_angle_handler)
-        self.control_loop_task = timed_task.TimedTask(delay=DELAY, run=self.control_loop_handler)
+        self.control_loop_task = TimedTask(delay=DELAY, run=self._control_loop_handler)
+        self.collect_data_task = TimedTask(delay=SAMPLE_TIME, run=self._accumulate_sensor_data)
 
         self.previous_angle = 0.0
-        self.previous_speed = 0.0
-        self.counter = 0
+        self.speed = 0.0
+        self.average_speed = 0.0
+        self.counter = 0                        # Only to see if the algo doesnt run into time issues 
+
+        # Start-up
+        self.startup_angle_stable = False
+        self.within_angle_count = 0
+        self.stable_angle_threshold = 1  # Degrees
+        self.stable_angle_duration = 0.3  # Seconds
+        self.last_angle_stable_time = 0.0
+
+        # MPU data
+        self.collected_data = []
+
+        # Communication
+        self.udp_client = UdpClient(BROKER, PORT)
+        self.udp_client.start_sending()
+        self.udp_client.start_receiving()
 
         # Logging data
         self.data_collector = data_collector
@@ -93,36 +119,77 @@ class BalancingRobot:
 
 
     # @Timer(name="Control loop", text="Control loop: {milliseconds:.6f}ms")
-    def control_loop_handler(self, now, dt):
+    def _control_loop_handler(self, now, dt):
         """Main control loop handler"""
+        # Average MPU value to simulate remote calculation possibility
         if AVERAGE_MPU_VALUES:
-            while self.mpudata_queue.empty():
-                pass
-            data = self.mpudata_queue.get_nowait()
+            data = self._get_average_readings()
         else:
             data = self.mpu.get_all_data()
     
         angle, accel_angle, gyro_angle = self._calculate_angle(data, dt)
-        avg_steps = self._calculate_average_steps()
-        if USE_POS_PID:
-            target_angle, pp, pi, pd = self.pos_pid.update(avg_steps, dt)
-            if FILTER_TARGET_ANGLE:
-                filtered_target_angle = self._filter_target_angle(target_angle)
+
+        # Disable motors at start-up until a good angle has been kept for a duration
+        # Might be necessary to prevent PID imbalance at start
+        if not self.startup_angle_stable:
+            if abs(angle) <= self.stable_angle_threshold:
+                if self.within_angle_count == 0:
+                    self.last_angle_stable_time = now
+                self.within_angle_count += 1
+                if (now - self.last_angle_stable_time) >= self.stable_angle_duration:
+                    self.startup_angle_stable = True
+                    print("Startup angle stability achieved. Starting motor control..")
+            else:
+                self.within_angle_count = 0  # Reset if angle exceeds threshold
+            print(f'Angle: {angle:7.4f} | Angle counter: {self.within_angle_count}')
         else:
-            target_angle, pp, pi, pd = 0.0, 0.0, 0.0, 0.0
-        angle_pid_setpoint = filtered_target_angle if FILTER_TARGET_ANGLE else target_angle
+            avg_steps = self._calculate_average_steps()
+            if USE_POS_PID:
+                pos_output, pp, pi, pd = self.pos_pid.update(avg_steps, dt)
+                target_angle = pos_output
+                if FILTER_TARGET_ANGLE:
+                    filtered_target_angle = self._filter_target_angle(pos_output)
+            else:
+                pos_output, pp, pi, pd = 0.0, 0.0, 0.0, 0.0
+                target_angle = pos_output
 
-        speed, ap, ai, ad = self._update_angle_pid(angle_pid_setpoint, angle, dt)
-        self._apply_motor_controls(speed)
-        self.counter += 1
-        print(f'Angle: {angle:7.4f} | Speed: {speed:7.4f} | T_angle: {target_angle:7.4f}')
+            if USE_SPEED_PID:
+                avg_steps_per_second = self._calculate_average_speed()
+                self.speed_pid.set_setpoint(avg_steps_per_second)       # average speed in steps per second
+                # self.speed_pid.set_setpoint(self.average_speed)       # average speed between -100 and 100
+                speed_output, sp, si, sd = self.speed_pid.update(avg_steps/1000, dt)
+                target_angle = -speed_output
+            else:
+                avg_steps_per_second, speed_output, sp, si, sd = 0.0, 0.0, 0.0, 0.0, 0.0
 
-        if LOG_DATA:
-            self._log_data(data, now, angle, accel_angle, gyro_angle, pp, pi, pd, target_angle, ap, ai, ad, speed, avg_steps)
-            # print(f'0: {data[0]:7.4f}, 1: {data[1]:7.4f}, 2: {data[2]:7.4f}, 3: {data[3]:7.4f}, 4: {data[4]:7.4f}, 5: {data[5]:7.4f}, Angle: {angle}')
-            # print(f'Angle: {angle:7.4f} | Speed: {speed:7.4f} | T_angle: {target_angle:7.4f}')
-            # print(f'gx: {data[3]:6.4f} | gy: {data[4]:6.4f} | gz: {data[5]:6.4f} | Angle: {angle:6.4f}')
+            angle_pid_setpoint = filtered_target_angle if FILTER_TARGET_ANGLE else target_angle
+
+            self.speed, ap, ai, ad = self._update_angle_pid(angle_pid_setpoint, angle, dt)
+            self._apply_motor_controls(self.speed)
+            self.counter += 1
+            # print(f'Angle: {angle:7.4f} | Speed: {self.speed:7.4f} | dt: {dt:7.4f}')
+
+            if LOG_DATA:
+                self._log_data(data, now, angle, accel_angle, gyro_angle, target_angle, pp, pi, pd, pos_output, ap, ai, ad, self.speed, speed_output, sp, si, sd, avg_steps, avg_steps_per_second)
+                # print(f'0: {data[0]:7.4f}, 1: {data[1]:7.4f}, 2: {data[2]:7.4f}, 3: {data[3]:7.4f}, 4: {data[4]:7.4f}, 5: {data[5]:7.4f}, Angle: {angle}')
+                # print(f'gx: {data[3]:6.4f} | gy: {data[4]:6.4f} | gz: {data[5]:6.4f} | Angle: {angle:6.4f}')
     
+
+    # @Timer(name="sensor", text="Collect data: {milliseconds:.6f}ms")
+    def _accumulate_sensor_data(self, now, dt):
+        tmp_data = self.mpu.get_all_data()
+        self.collected_data.append(tmp_data)
+        if len(self.collected_data) > 3:
+            self.collected_data.pop(0)
+
+    # @Timer(name="average", text="average angle: {milliseconds:.6f}ms")
+    def _get_average_readings(self):
+        if len(self.collected_data) > 0:
+            avg_data = np.mean(self.collected_data, axis=0)
+            return avg_data
+        else:
+            return [0, 0, 0, 0, 0, 0]
+
     
     def _calculate_angle(self, data, dt):
         """Calculate angle from accelerometer and gyroscope data"""
@@ -158,9 +225,14 @@ class BalancingRobot:
 
     def _calculate_average_steps(self):
         """Calculate average steps from motor positions"""
-        steps = ((self.left_motor.get_position() + self.right_motor.get_position()) / 2) / MICROSTEPS
+        steps = ((self.left_motor.get_position() + self.right_motor.get_position()) / 2) # / MICROSTEPS
         return steps
 
+
+    def _calculate_average_speed(self):
+        # Calculates and returns average steps per second
+        self.average_speed = 0.5 * self.average_speed + 0.5 * self.speed    # avg_speed in %
+        return (self.average_speed / 100) * 3000                            # avg_speed in steps per second
 
     def _update_angle_pid(self, target_angle: float, angle: float, dt: float) -> tuple[float, float, float, float]:
         """
@@ -179,8 +251,8 @@ class BalancingRobot:
         speed, p_term, i_term, d_term = self.angle_pid.update(angle, dt)
         
         # Negate speed to get positive angle -> positive speed
-        negated_speed = -speed  
-        return negated_speed, p_term, i_term, d_term
+        speed = -speed  
+        return speed, p_term, i_term, d_term
 
 
     def _filter_target_angle(self, target_angle):
@@ -202,7 +274,7 @@ class BalancingRobot:
         self.right_motor.shutdown()
 
 
-    def _log_data(self, data, timestamp, angle, accel_angle, gyro_angle, pp, pi, pd, target_angle, ap, ai, ad, speed, steps):
+    def _log_data(self, data, timestamp, angle, accel_angle, gyro_angle, target_angle, pp, pi, pd, pos_pid_output, ap, ai, ad, angle_pid_output, sp, si, sd, speed_pid_output, avg_steps, avg_sps):
         self.data_collector.log_data('ax', data[0])
         self.data_collector.log_data('ay', data[1])
         self.data_collector.log_data('az', data[2])
@@ -214,13 +286,49 @@ class BalancingRobot:
         self.data_collector.log_data('angle', angle)
         self.data_collector.log_data('accel_angle', accel_angle)
         self.data_collector.log_data('gyro_angle', gyro_angle)
-        self.data_collector.log_data('steps', steps)
-        self.data_collector.log_pid_data('pos', pp, pi, pd, target_angle)
-        self.data_collector.log_pid_data('angle', ap, ai, ad, speed)
+        self.data_collector.log_data('target_angle', target_angle)
+        self.data_collector.log_data('avg_steps', avg_steps)
+        self.data_collector.log_data('avg_sps', avg_sps)
+        self.data_collector.log_pid_data('pos', pp, pi, pd, pos_pid_output)
+        self.data_collector.log_pid_data('angle', ap, ai, ad, angle_pid_output)
+        self.data_collector.log_pid_data('speed', sp, si, sd, speed_pid_output)
+
+        # ms_since_start = (timestamp - self.starting_time) * 1000
+
+        # data_entry = {
+        #     'timestamp': ms_since_start,
+        #     'ax': data[0],
+        #     'ay': data[1],
+        #     'az': data[2],
+        #     'gx': data[3],
+        #     'gy': data[4],
+        #     'gz': data[5],
+        #     'angle': angle,
+        #     'accel_angle': accel_angle,
+        #     'gyro_angle': gyro_angle,
+        #     'target_angle': target_angle,
+        #     'avg_steps': avg_steps,
+        #     'avg_steps_per_second': avg_sps,
+        #     'pos_p': pp,
+        #     'pos_i': pi,
+        #     'pos_d': pd,
+        #     'pos_output': pos_output,
+        #     'angle_p': ap,
+        #     'angle_i': ai,
+        #     'angle_d': ad,
+        #     'angle_o': ao,
+        #     'speed_p': sp,
+        #     'speed_i': si,
+        #     'speed_d': sd,
+        #     'speed_output': speed_output
+        # }
+
+        # self.data_collector.log_data(data_entry)
 
 
     # @Timer(name="Main loop", text="Main loop: {milliseconds:.6f}ms")
     def loop(self):
+        self.collect_data_task.loop()
         self.control_loop_task.loop()
 
         if USE_MOTORS and not USE_THREADED_MOTORS:

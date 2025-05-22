@@ -363,7 +363,7 @@ def _convert_to_signed(value):
 
 
 if __name__ == "__main__":
-    dt = 0.01
+    dt = 0.02
     previous_pitch = 0.0
     alpha = 0.98
     timer = time.time()
@@ -390,9 +390,10 @@ if __name__ == "__main__":
     # from math import atan2, sqrt, degrees
     
     # while ((time.time() - timer) < 5):
-    #     loop_start = time.time()
+    # while True:
+        # loop_start = time.time()
     #     # data_list = mpu.get_fifo_buffer()
-    #     data = mpu.get_all_data()
+        # data = mpu.get_all_data()
         # print(mpu.get_raw_data())
     #     # if data_list is not None:
     #         # for data in data_list:
@@ -401,12 +402,12 @@ if __name__ == "__main__":
 
     #     previous_pitch = alpha * pitch_gyro_integration + (1 - alpha) * pitch_from_acceleration
     #     counter += 1
-    #     print(f'0: {data[0]:8.4f}, 1: {data[1]:8.4f}, 2: {data[2]:8.4f}, 3: {data[3]:8.4f}, 4: {data[4]:8.4f}, 5: {data[5]:8.4f}, Pitch: {previous_pitch:6.4f}')
+        # print(f'0: {data[0]:8.4f}, 1: {data[1]:8.4f}, 2: {data[2]:8.4f}, 3: {data[3]:8.4f}, 4: {data[4]:8.4f}, 5: {data[5]:8.4f}, Pitch: {previous_pitch:6.4f}')
         
         # loop_end = time.time()
         # loop_duration = loop_end - loop_start
 
         # sleep_time = max(0, dt - loop_duration)
-        # time.sleep(sleep_time)
+        # time.sleep(0.1)
 
     # print(counter)
