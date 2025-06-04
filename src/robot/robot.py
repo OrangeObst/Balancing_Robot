@@ -110,8 +110,6 @@ class BalancingRobot:
 
         # Communication
         self.udp_client = UdpClient(BROKER, PORT)
-        self.udp_client.start_sending()
-        self.udp_client.start_receiving()
 
         # Logging data
         self.data_collector = data_collector
@@ -128,7 +126,10 @@ class BalancingRobot:
             data = self.mpu.get_all_data()
     
         angle, accel_angle, gyro_angle = self._calculate_angle(data, dt)
-
+        
+        timestamp = time()
+        self.udp_client.send(timestamp)
+        
         # Disable motors at start-up until a good angle has been kept for a duration
         # Might be necessary to prevent PID imbalance at start
         if not self.startup_angle_stable:
@@ -167,7 +168,7 @@ class BalancingRobot:
             self.speed, ap, ai, ad = self._update_angle_pid(angle_pid_setpoint, angle, dt)
             self._apply_motor_controls(self.speed)
             self.counter += 1
-            # print(f'Angle: {angle:7.4f} | Speed: {self.speed:7.4f} | dt: {dt:7.4f}')
+            print(f'Angle: {angle:7.4f} | Speed: {self.speed:7.4f} | dt: {dt:7.4f}')
 
             if LOG_DATA:
                 self._log_data(data, now, angle, accel_angle, gyro_angle, target_angle, pp, pi, pd, pos_output, ap, ai, ad, self.speed, speed_output, sp, si, sd, avg_steps, avg_steps_per_second)

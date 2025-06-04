@@ -162,7 +162,7 @@ if __name__ == "__main__":
         plotter = Plotter(angle_pid_const, pos_pid_const, speed_pid_const)
         plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle'], 'Target angle': collected_data['pos_pid_terms']['output']}, TIMER, 'Steps', {'Steps': collected_data['avg_steps']})
         plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle']}, TIMER, 'Speed', {'Speed': collected_data['angle_pid_terms']['output']}, name='Angle_to_Speed')        
-        plotter.plot_measurements('Accel', {'ax': collected_data['ax'], 'ay': collected_data['ay']}, TIMER, name="Accel_Data")
+        plotter.plot_measurements('Accel', {'ax': collected_data['ax'], 'ay': collected_data['ay'], 'az': collected_data['az']}, TIMER, name="Accel_Data")
         plotter.plot_measurements('Gyro', {'gx': collected_data['gx'], 'gy': collected_data['gy'], 'gz': collected_data['gz']}, TIMER, name="Gyro_Data")
         plotter.plot_measurements('PD values', {'P terms': collected_data['angle_pid_terms']['p_terms'], 'D terms': collected_data['angle_pid_terms']['d_terms'], 'Output': collected_data['angle_pid_terms']['output']}, TIMER, name='PD graph')
         plotter.subplot_p_i_d_values('Angle', collected_data['angle_pid_terms'], TIMER, 100, unified_y_limit=False, name='PID_Terms')
