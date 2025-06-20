@@ -1,5 +1,4 @@
 import threading
-from codetiming import Timer
 
 class ThreadedStepper(threading.Thread):
     def __init__(self, stepper_motor):

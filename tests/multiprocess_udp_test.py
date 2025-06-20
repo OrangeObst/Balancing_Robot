@@ -1,9 +1,9 @@
 import sys
 import os
 import time
-import threading
-import time
+import multiprocessing
 import statistics
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.util.udp_client import UdpClient
@@ -15,20 +15,24 @@ DELAY = 0.005
 
 class UdpTest:
     def __init__(self, server_host, server_port, messages=10, delay=0.1):
-        self.client = UdpClient(server_host, server_port)
+        self.server_host = server_host
+        self.server_port = server_port
         self.messages = messages
         self.counter = 0
-        self.latencies = []
         self.start_time = None
         self.end_time = None
-        self.receiving_thread = None
-        self.run_thread = True
+        self.receiving_process = None
         self.delay = delay
+
+        self.run_process = multiprocessing.Value('b', True)
+        self.manager = multiprocessing.Manager()
+        self.latencies = self.manager.list()
 
     def start_test(self):
         self.start_time = time.time()
-        self.receiving_thread = threading.Thread(target=self.receive_messages)
-        self.receiving_thread.start()
+        self.client = UdpClient(self.server_host, self.server_port)
+        self.receiving_process = multiprocessing.Process(target=self.receive_messages, args=[self.client, self.latencies, self.run_process])
+        self.receiving_process.start()
         for _ in range(self.messages):
             message = time.time()
             self.client.send(message)
@@ -36,23 +40,24 @@ class UdpTest:
             time.sleep(self.delay)
         self.client.send('done')
 
-    def receive_messages(self):
-        while self.run_thread:
-            data = self.client.receive_messages()
+    def receive_messages(self, client, latencies, run_process):
+        while run_process.value:
+            data = client.receive_messages()
             if data == 'done':
-                self.run_thread = False
+                self.run_process.value = False
                 break
             if data is not None:
                 latency = time.time() - data
-                self.latencies.append(latency)
+                latencies.append(latency)
 
     def calculate_stats(self):
-        if self.latencies:
-            self.min_latency = min(self.latencies)
-            self.max_latency = max(self.latencies)
-            self.avg_latency = sum(self.latencies) / len(self.latencies)
-            self.jitter = statistics.stdev(self.latencies)
-            self.packet_loss_rate = (self.counter - len(self.latencies)) / self.counter
+        latencies = list(self.latencies)
+        if len(latencies) > 0:
+            self.min_latency = min(latencies)
+            self.max_latency = max(latencies)
+            self.avg_latency = sum(latencies) / len(latencies)
+            self.jitter = statistics.stdev(latencies)
+            self.packet_loss_rate = (self.counter - len(latencies)) / self.counter
         else:
             self.min_latency = self.max_latency = self.avg_latency = self.jitter = self.packet_loss_rate = "N/A"
 
@@ -61,28 +66,26 @@ class UdpTest:
         print(f"Maximum latency: {self.max_latency:.4f} seconds")
         print(f"Average latency: {self.avg_latency:.4f} seconds")
         print(f"Jitter: {self.jitter:.4f} seconds")
-        print(f"Packet loss rate: {self.packet_loss_rate * 100:.2f}%")
+        print(f"Packet loss rate: {self.packet_loss_rate * 100:.4f}%")
 
     def close(self):
+        if self.receiving_process:
+            self.receiving_process.join()
         self.client.close()
-        if self.receiving_thread:
-            self.receiving_thread.join()
 
-    def kill_threads(self):
-        self.run_thread = False
+    def kill_process(self):
+        self.run_process.value = False
 
 
 if __name__ == "__main__":
     udp_test = UdpTest(BROKER, PORT, TEST_COUNT, DELAY)
     try:
         udp_test.start_test()
-        udp_test.receiving_thread.join()
-        # while not udp_test.run_thread:
-        #     time.sleep(0.1)  # Wait for the receiving thread to complete
+        udp_test.receiving_process.join()
     except KeyboardInterrupt:
         print("KeyboardInterrupt has been called")
     finally:
-        udp_test.kill_threads()
+        udp_test.kill_process()
         udp_test.close()
 
     udp_test.calculate_stats()

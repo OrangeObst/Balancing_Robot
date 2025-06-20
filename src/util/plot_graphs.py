@@ -99,7 +99,7 @@ class Plotter:
                 plts[i, j].set_title(f'{pid_type} {label.capitalize()} (O = P+I-D)')
 
         plt.tight_layout()
-        plt.savefig(f'graphs/{pid_type}_{name}.png')
+        plt.savefig(f'graphs/{name}.png')
         # except Exception as e:
         #     print(f"Error in subplot_p_i_d_values: {e}")
 
