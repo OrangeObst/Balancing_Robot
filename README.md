@@ -20,15 +20,15 @@ This project showcases a self-balancing robot designed to demonstrate stability 
 * Raspberry Pi 4B
 * Waveshare Stepper Motor HAT with two DRV8825 motor drivers
 * MPU6050
-* 2 NEMA 17 Stepper Motors
+* 2 NEMA 17 Stepper Motors with 1.8° per step, 1.5A
 * 3D-printed parts for the robot's body
 
 ### Software:
-*  Python 3.9
+*  Python 3.12
 *  RPi.GPIO
 *  smbus2
 *  numpy
-*  matplotlib (for debugging)
+*  matplotlib
 
 <!-- ## Getting Started
 -------------------
@@ -44,15 +44,15 @@ This project showcases a self-balancing robot designed to demonstrate stability 
 
 1. **Hardware Assembly**
    - Ensure all parts are connected properly. Especially cables from MPU6050 to the Stepper Motor HAT may be loose
-   - Ensure that the batteries have enough charge to power the robot. Low charge may weaken the results
+   - Ensure that the batteries have enough charge to power the robot. Low charge may cause strange behaviour
 
 2. **Software Installation**
    - Clone this repository: `git clone https://github.com/OrangeObst/Balancing_Robot.git`
-   - Install all required Python libraries by running:
+   - Install all required Python libraries by navigating to the projects root directory and running:
      ```bash
      pip install -r requirements.txt
      ```
-     **Note:** Ensure you're in the project's root directory when executing the command.
+     **Note:** Ensure you're in the project's root directory before executing the command.
 
 3. **Calibration**
    - Stand the robot upright at the angle at which it is in equilibrium

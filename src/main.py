@@ -1,7 +1,5 @@
-from math import degrees, atan2, sqrt
 from robot.robot import BalancingRobot
 from util.data_collector import DataCollector
-# from util.new_data_collector import DataCollector
 from util.plot_graphs import Plotter
 from robot.MPU.MyMpu6050 import MyMPU6050
 from robot.pid_controller import PID_Controller
@@ -11,9 +9,6 @@ from robot.threaded_motors import ThreadedStepper
 from time import time
 from smbus2 import SMBus
 from configparser import ConfigParser
-
-# TODO: Threaded motor implementation seems to be wrong. 
-# I lose nearly 10% off of counter, motors don't turn properly and are louder than usual
 
 config = ConfigParser()
 config.read('/home/newPi/Desktop/Balancing_Robot/src/settings.ini')

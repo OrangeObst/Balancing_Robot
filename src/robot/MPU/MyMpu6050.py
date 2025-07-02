@@ -1,7 +1,5 @@
 import time
 from smbus2 import SMBus
-from codetiming import Timer
-from math import degrees, atan2, sqrt
 
 '------------------ MPU REGISTERS ------------------'
 
@@ -33,12 +31,6 @@ _MPU6050_FIFO_COUNTH        = 0x72 # Read FIFO count high
 _MPU6050_FIFO_COUNTL        = 0x73 # Read FIFO count low
 _MPU6050_FIFO_R_W           = 0x74 # Read FIFO values
 _MPU6050_WHO_AM_I           = 0x75 # Divice ID register
-
-'''
-    ------------------ SCALES ------------------
-'''
-
-
 
 
 class MyMPU6050:
@@ -114,7 +106,7 @@ class MyMPU6050:
         value = self.bus.read_byte_data(self.address, address)
         return value
 
-    def calibrate_sensor(self, time_dur=5):
+    def calibrate_sensor(self, duration=5):
         print("Calibrating sensor, do not move the system")
         self.reset_mpu()
         self.set_register(_MPU6050_PWR_MGMT_1, 0x01)
@@ -127,9 +119,8 @@ class MyMPU6050:
         self.GZ_OFFSET = 0.0
 
         counter = 0
-        
         timer = time.time()
-        while ((time.time() - timer) < time_dur):
+        while ((time.time() - timer) < duration):
             
             ax, ay, az, gx, gy, gz = self.get_raw_data()
             counter += 1
@@ -143,6 +134,7 @@ class MyMPU6050:
             
             if (counter % 100) == 0:
                 print (f'Counter: {counter}')
+            time.sleep(0.01)
 
         self.AX_OFFSET /= counter
         self.AY_OFFSET /= counter
@@ -169,7 +161,7 @@ class MyMPU6050:
         print(f'OFFSET GX, GY, GZ {self.GX_OFFSET:.6f}, {self.GY_OFFSET:.6f}, {self.GZ_OFFSET:.6f}')
 
 
-    def set_smplrt_div(self, bit_mask=0x0):
+    def set_smplrt_div(self, bit_mask: int = 0x00):
         if bit_mask < 0 or bit_mask > 255:
             raise ValueError("SMPLRT_DIV value must be between 0 and 255")
         self.set_register(_MPU6050_SMPLRT_DIV, bit_mask)
@@ -178,7 +170,20 @@ class MyMPU6050:
         bit_mask = self.read_register(_MPU6050_SMPLRT_DIV) & 0xFF
         return bit_mask
 
-    def set_dlpf_cfg(self, bit_mask=0x0):
+    def set_dlpf_cfg(self, bit_mask: int = 0x00):
+        '''
+        DLPF_CFG  |         Accelerometer        |               Gyroscope
+                  |          (Fs = 1kHz)         |
+                  |  Bandwidth(Hz)   Delay(ms)   |   Bandwidth(Hz)   Delay(ms)  Fs(kHz)
+            0     |      260             0       |         256           0.98      8
+            1     |      184             2.0     |         188           1.9       1
+            2     |      94              3.0     |          98           2.8       1
+            3     |      44              4.9     |          42           4.8       1
+            4     |      21              8.5     |          20           8.3       1
+            5     |      10             13.8     |          10           13.4      1
+            6     |      5               19.0    |           5           18.6      1
+            7     |          RESERVED            |           RESERVED              8
+        '''
         if bit_mask > 0x6:
             raise ValueError("DLPF_CFG value must be between 0x0 and 0x6")
         self.set_register(_MPU6050_CONFIG, bit_mask)
@@ -187,47 +192,37 @@ class MyMPU6050:
         bit_mask = self.read_register(_MPU6050_CONFIG) & 0x07
         return bit_mask
 
-    def set_gyro_config(self, value: int = 0):
-        if value < 0 or value > 248:
-            raise ValueError("Gyro cfg value must be between 8 and 248")
-        value = (value & ~0x07)
-        range = value & 0x18
-        match range:
-            case 0x00:
-                self.GYRO_SCALE = 131
-            case 0x08:
-                self.GYRO_SCALE = 65.5
-            case 0x10:
-                self.GYRO_SCALE = 32.8
-            case 0x18:
-                self.GYRO_SCALE = 16.4
-            case _:
-                pass
-        # print(f'Gyro scale: {self.GYRO_SCALE}')
-        self.set_register(_MPU6050_GYRO_CONFIG, value)
+    def set_gyro_config(self, bit_mask: int = 0x00):
+        if bit_mask not in [0x00, 0x08, 0x10, 0x18]:
+            raise ValueError("Gyro cfg value should be one of 0x00, 0x08, 0x10, or 0x18")
+
+        if bit_mask == 0x00:
+            self.GYRO_SCALE = 131
+        elif bit_mask == 0x08:
+            self.GYRO_SCALE = 65.5
+        elif bit_mask == 0x10:
+            self.GYRO_SCALE = 32.8
+        elif bit_mask == 0x18:
+            self.GYRO_SCALE = 16.4
+        self.set_register(_MPU6050_GYRO_CONFIG, bit_mask)
 
     def get_gyro_config(self) -> int:
-        value = self.read_register(_MPU6050_GYRO_CONFIG) & 0xFF
-        return value
+        bit_mask = self.read_register(_MPU6050_GYRO_CONFIG) & 0xFF
+        return bit_mask
 
-    def set_accel_config(self, value: int = 0):
-        if value < 0 or value > 248:
-            raise ValueError("Accel cfg value must be between 8 and 248")
-        value = (value & ~0x07)
-        range = value & 0x18
-        match range:
-            case 0:
-                self.ACCEL_SCALE = 16384
-            case 8:
-                self.ACCEL_SCALE = 8192
-            case 16:
-                self.ACCEL_SCALE = 4096
-            case 24:
-                self.ACCEL_SCALE = 2048
-            case _:
-                pass
-        # print(f'Accel scale: {self.ACCEL_SCALE}')
-        self.set_register(_MPU6050_ACCEL_CONFIG, value)
+    def set_accel_config(self, bit_mask: int = 0x00):
+        if bit_mask not in [0x00, 0x08, 0x10, 0x18]:
+            raise ValueError("Accel cfg value should be one of 0x00, 0x08, 0x10, or 0x18")
+
+        if bit_mask == 0x00:
+            self.ACCEL_SCALE = 16384
+        elif bit_mask == 0x08:
+            self.ACCEL_SCALE = 8192
+        elif bit_mask == 0x10:
+            self.ACCEL_SCALE = 4096
+        elif bit_mask == 0x18:
+            self.ACCEL_SCALE = 2048
+        self.set_register(_MPU6050_ACCEL_CONFIG, bit_mask)
 
     def get_accel_config(self) -> int:
         value = self.read_register(_MPU6050_ACCEL_CONFIG) & 0xFF
@@ -269,7 +264,7 @@ class MyMPU6050:
 
     def reset_fifo(self):
         bit_mask = self.read_register(_MPU6050_USER_CTRL)
-        bit_mask = (bit_mask & ~0x40) | 0x04        # Disable FIFO and set reset flag
+        bit_mask = (bit_mask & ~0x40) | 0x04
         self.set_register(_MPU6050_USER_CTRL, bit_mask)
         time.sleep(0.01)
     
@@ -285,7 +280,7 @@ class MyMPU6050:
         Action:
         Sets the MPU6050 FIFO_ENABLE register with the provided bitmask.
         """
-        self.set_register(_MPU6050_FIFO_EN, bits)   # Accel and Gyro to FIFO register
+        self.set_register(_MPU6050_FIFO_EN, bits)
 
     def get_fifo_count(self):
         fifo_count_h = self.read_register(_MPU6050_FIFO_COUNTH)
@@ -297,10 +292,8 @@ class MyMPU6050:
         flag = self.read_register(_MPU6050_INT_STATUS) & 0x10
         return flag
 
-    # @Timer(name="Fifo", text="Fifo: {milliseconds:.6f}ms")
     def get_fifo_buffer(self):
         fifo_count = self.get_fifo_count()
-        print(f' ----- {fifo_count} ----- ')
         packets = []
 
         if fifo_count < 12:
@@ -322,6 +315,10 @@ class MyMPU6050:
             return packets
         
     def optimize_sample_settings(self, dt):
+        '''
+        This function tries to optimize the sample settings of the MPU6050 based on the desired time step (dt).
+        It selects the best DLPF configuration and calculates the sample rate divider to achieve the target sample rate.
+        '''
         dlpf_configs = {
             0: (0.0, 0.98),  # Delay in ms for Accel, Gyro respectively
             1: (2.0, 1.9),
@@ -350,13 +347,6 @@ class MyMPU6050:
         self.set_register(_MPU6050_PWR_MGMT_1, 0x80)
         time.sleep(0.1)
 
-    def get_pitch_from_accelerometer(self):
-        data = self.get_all_data()
-        return atan2(data[0], sqrt(data[1]**2 + data[2]**2))
-
-    def get_roll_from_accelerometer(self):
-        data = self.get_all_data()
-        return atan2(data[1], sqrt(data[0]**2 + data[2]**2))
 
 def _convert_to_signed(value):
     return value if value < 0x8000 else value - 0x10000
