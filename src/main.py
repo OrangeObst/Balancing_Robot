@@ -1,7 +1,5 @@
-from math import degrees, atan2, sqrt
 from robot.robot import BalancingRobot
 from util.data_collector import DataCollector
-# from util.new_data_collector import DataCollector
 from util.plot_graphs import Plotter
 from robot.MPU.MyMpu6050 import MyMPU6050
 from robot.pid_controller import PID_Controller

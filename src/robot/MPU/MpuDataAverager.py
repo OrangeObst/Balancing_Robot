@@ -3,12 +3,12 @@ from queue import Queue
 import time
 
 class MpuDataAverager(threading.Thread):
-    def __init__(self, mpu, queue, sample_rate=0.003):  # 3ms sample rate
+    def __init__(self, mpu, queue, sample_rate=0.003):
         super().__init__()
         self.mpu = mpu
         self.queue = queue
         self.sample_rate = sample_rate
-        self.num_samples = int(0.01 / sample_rate)  # ~3 samples in 10ms
+        self.num_samples = int(0.01 / sample_rate)
         self.samples = []
 
     def run(self):
