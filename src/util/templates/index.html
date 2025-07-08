@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>MPU6050 Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client/dist/socket.io.js"></script>
+    <style>
+        #chartContainer {
+            width: 1200px;
+            height: 600px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="chartContainer"><canvas id="angleChart" width="1200" height="600"></canvas></div>
+    <script>
+        const ctx = document.getElementById('angleChart').getContext('2d');
+        const angleChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Angle',
+                    data: [],
+                    borderColor: 'rgba(255, 1, 1, 1)',
+                    borderWidth: 2
+                }, {
+                    label: 'Accel_angle',
+                    data: [],
+                    borderColor: 'rgba(1, 1, 255, 1)',
+                    borderWidth: 2
+                }, {
+                    label: 'Gyro_angle',
+                    data: [],
+                    borderColor: 'rgba(1, 255, 1, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: false
+                    }
+                },
+                animation: false
+            }
+        });
+
+        const socket = io();
+        let updateCounter = 0;
+        const maxDataPoints = 150;
+
+        socket.on('data', function (data) {
+            updateCounter++;
+            if (updateCounter % 50 === 0) {
+                angleChart.data.labels.push(new Date().toLocaleTimeString());
+            } else {
+                angleChart.data.labels.push('');
+            }
+
+            angleChart.data.datasets[0].data.push(data.angle);
+            angleChart.data.datasets[1].data.push(data.accel_angle);
+            angleChart.data.datasets[2].data.push(data.gyro_angle);
+
+            if (angleChart.data.labels.length > maxDataPoints) {
+                angleChart.data.labels.shift();
+                angleChart.data.datasets.forEach(dataset => dataset.data.shift());
+            }
+
+            angleChart.update();
+        });
+    </script>
+</body>
+
+</html>

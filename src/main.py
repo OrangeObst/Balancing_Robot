@@ -12,7 +12,7 @@ from time import time
 from smbus2 import SMBus
 from configparser import ConfigParser
 
-# TODO: Threaded motor implementation seems to be wrong. 
+# TODO: Implement low pass filter for the derivative term within the PID controller
 # I lose nearly 10% off of counter, motors don't turn properly and are louder than usual
 
 config = ConfigParser()
@@ -155,8 +155,8 @@ if __name__ == "__main__":
         collected_data = data_collector.get_collected_data()
 
         plotter = Plotter(angle_pid_const, pos_pid_const, speed_pid_const)
-        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle'], 'Target angle': collected_data['pos_pid_terms']['output']}, TIMER, 'Steps', {'Steps': collected_data['avg_steps']})
-        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle']}, TIMER, 'Speed', {'Speed': collected_data['angle_pid_terms']['output']}, name='Angle_to_Speed')        
+        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle'], 'Target angle': collected_data['pos_pid_terms']['output']}, 'Steps', {'Steps': collected_data['avg_steps']}, TIMER, name='Angles_to_steps')
+        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle']}, 'Speed', {'Speed': collected_data['angle_pid_terms']['output']}, TIMER, name='Angle_to_Speed')        
         plotter.plot_measurements('Angles [°]', {'Accel angle': collected_data['accel_angle'], 'Gyro angle': collected_data['gyro_angle']}, TIMER, name='Accel_Gyro_angles')
         plotter.plot_measurements('Accel', {'ax': collected_data['ax'], 'ay': collected_data['ay'], 'az': collected_data['az']}, TIMER, name="Accel_Data")
         plotter.plot_measurements('Gyro', {'gx': collected_data['gx'], 'gy': collected_data['gy'], 'gz': collected_data['gz']}, TIMER, name="Gyro_Data")

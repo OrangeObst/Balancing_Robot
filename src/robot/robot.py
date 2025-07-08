@@ -1,15 +1,14 @@
 from configparser import ConfigParser
 from math import degrees, atan2, sqrt
-# from queue import Queue
-
 import numpy as np
 # from robot.MPU.MpuDataAverager import MpuDataAverager
 from robot.threaded_motors import ThreadedStepper
 from robot.processed_motors import MultiprocessingStepper
 from util.timed_task import TimedTask
 from util.lowpassfilter import LowPassFilter
+from util.websocket import WebSocketServer
 from time import time
-from codetiming import Timer
+# from codetiming import Timer
 
 from util.udp_client import UdpClient
 
@@ -117,6 +116,10 @@ class BalancingRobot:
         # Communication
         self.udp_client = UdpClient(BROKER, PORT)
 
+        # Server
+        self.server = WebSocketServer()
+        self.server.start()
+
         # Logging data
         self.data_collector = data_collector
         self.starting_time = time()
@@ -162,10 +165,10 @@ class BalancingRobot:
 
             if USE_SPEED_PID:
                 avg_steps_per_second = self._calculate_average_speed()
-                self.speed_pid.set_setpoint(avg_steps_per_second)       # average speed in steps per second
-                # self.speed_pid.set_setpoint(self.average_speed)       # average speed between -100 and 100
-                speed_output, sp, si, sd = self.speed_pid.update(avg_steps/1000, dt)
-                target_angle = -speed_output
+                # self.speed_pid.set_setpoint(avg_steps_per_second)       # average speed in steps per second
+                self.speed_pid.set_setpoint(self.average_speed)       # average speed between -100 and 100
+                speed_output, sp, si, sd = self.speed_pid.update(-(avg_steps/1000), dt)
+                target_angle = speed_output
             else:
                 avg_steps_per_second, speed_output, sp, si, sd = 0.0, 0.0, 0.0, 0.0, 0.0
 
@@ -174,7 +177,8 @@ class BalancingRobot:
             self.speed, ap, ai, ad = self._update_angle_pid(angle_pid_setpoint, angle, dt)
             self._apply_motor_controls(self.speed)
             self.counter += 1
-            print(f'Angle: {angle:7.4f} | Speed: {self.speed:7.4f} | dt: {dt:7.4f}')
+            # print(f'Angle: {angle:7.4f} | Speed: {self.speed:7.4f} | dt: {dt:7.4f}')
+            self.server.emit_data({'angle': angle, 'accel_angle': accel_angle, 'gyro_angle': gyro_angle})
 
             if LOG_DATA:
                 self._log_data(data, now, angle, accel_angle, gyro_angle, target_angle, pp, pi, pd, pos_output, ap, ai, ad, self.speed, speed_output, sp, si, sd, avg_steps, avg_steps_per_second)
@@ -267,7 +271,7 @@ class BalancingRobot:
 
 
     def _filter_target_angle(self, target_angle):
-        """Filter target angle to ensure it's within valid bounds"""
+        """Filter target angle and ensure it's within valid bounds"""
         filtered_angle = self.lpf_target_angle.filter(target_angle)
         if LOG_DATA:
             self.data_collector.log_data('filtered_target_angles', filtered_angle)

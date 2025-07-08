@@ -104,7 +104,7 @@ class Plotter:
         #     print(f"Error in subplot_p_i_d_values: {e}")
 
 
-    def plot_measurements(self, left_axis_key, left_axis_values, timer, right_axis_key=None, right_axis_values=None, name="Measurement_Plot"):
+    def plot_measurements(self, left_axis_key, left_axis_values, right_axis_key=None, right_axis_values=None, timer=10, name="Measurement_Plot"):
         """
         Plot multiple series on the left axis and optionally on the right axis.
 
