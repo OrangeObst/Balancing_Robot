@@ -7,53 +7,73 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/socket.io-client/dist/socket.io.js"></script>
     <style>
-        #chartContainer {
-            width: 1200px;
-            height: 600px;
-            overflow: hidden;
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
         }
 
         #checkboxContainer {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             gap: 10px;
-            margin-bottom: 20px;
+            max-width: 800px;
+            margin-bottom: 10px;
         }
 
         #checkboxContainer label {
-            display: block;
             margin-left: 5px;
+        }
+
+        #updateButton {
+            margin: 10px 0;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .divider {
+            height: 1px;
+            background-color: #ccc;
+            margin: 20px 0;
+        }
+
+        #chartContainer {
+            position: relative;
+            width: 100%;
+            max-width: 1200px;
+            height: 60vh;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
         }
     </style>
 </head>
 
 <body>
-    <div id="checkboxContainer">
-        <div><input type="checkbox" value="angle" id="angle"><label for="angle">Angle</label></div>
-        <div><input type="checkbox" value="accel_angle" id="accel_angle"><label for="accel_angle">Accel Angle</label>
-        </div>
-        <div><input type="checkbox" value="gyro_angle" id="gyro_angle"><label for="gyro_angle">Gyro Angle</label></div>
-        <div><input type="checkbox" value="target_angle" id="target_angle"><label for="target_angle">Target
-                Angle</label></div>
-        <div><input type="checkbox" value="pp" id="pp"><label for="pp">PP</label></div>
-        <div><input type="checkbox" value="pi" id="pi"><label for="pi">PI</label></div>
-        <div><input type="checkbox" value="pd" id="pd"><label for="pd">PD</label></div>
-        <div><input type="checkbox" value="pos_output" id="pos_output"><label for="pos_output">Pos Output</label></div>
-        <div><input type="checkbox" value="ap" id="ap"><label for="ap">AP</label></div>
-        <div><input type="checkbox" value="ai" id="ai"><label for="ai">AI</label></div>
-        <div><input type="checkbox" value="ad" id="ad"><label for="ad">AD</label></div>
-        <div><input type="checkbox" value="self.speed" id="self.speed"><label for="self.speed">Self Speed</label></div>
-        <div><input type="checkbox" value="speed_output" id="speed_output"><label for="speed_output">Speed
-                Output</label></div>
-        <div><input type="checkbox" value="sp" id="sp"><label for="sp">SP</label></div>
-        <div><input type="checkbox" value="si" id="si"><label for="si">SI</label></div>
-        <div><input type="checkbox" value="sd" id="sd"><label for="sd">SD</label></div>
-        <div><input type="checkbox" value="avg_steps" id="avg_steps"><label for="avg_steps">Avg Steps</label></div>
-        <div><input type="checkbox" value="avg_steps_per_second" id="avg_steps_per_second"><label
-                for="avg_steps_per_second">Avg Steps Per Second</label></div>
-    </div><button id="updateButton">Update Chart</button>
-    <div id="chartContainer"><canvas id="angleChart" width="1200" height="600"></canvas></div>
+    <div id="checkboxContainer"></div>
+    <button id="updateButton">Update Chart</button>
+    <div class="divider"></div>
+    <div id="chartContainer">
+        <canvas id="angleChart"></canvas>
+    </div>
+
     <script>
+        const ALL_KEYS = [
+            "angle", "accel_angle", "gyro_angle", "target_angle",
+            "pp", "pi", "pd", "pos_output", "ap", "ai", "ad",
+            "speed", "speed_output", "sp", "si", "sd",
+            "avg_steps", "avg_steps_per_second"
+        ];
+
+        const checkboxContainer = document.getElementById('checkboxContainer');
+        ALL_KEYS.forEach(key => {
+            const div = document.createElement('div');
+            div.innerHTML = `<input type="checkbox" value="${key}" id="${key}"><label for="${key}">${key}</label>`;
+            checkboxContainer.appendChild(div);
+        });
+
         const ctx = document.getElementById('angleChart').getContext('2d');
         const angleChart = new Chart(ctx, {
             type: 'line',
@@ -62,81 +82,76 @@
                 datasets: []
             },
             options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
                 scales: {
-                    y: {
-                        beginAtZero: false
-                    }
+                    y: { beginAtZero: false },
+                    x: { display: false }
                 },
-                animation: false
+                plugins: {
+                    legend: { display: true }
+                }
             }
         });
 
         const socket = io();
-        let updateCounter = 0;
         const maxDataPoints = 150;
-        const checkboxContainer = document.getElementById('checkboxContainer');
-        const updateButton = document.getElementById('updateButton');
 
-        updateButton.addEventListener('click', updateChart);
+        function getColor(index) {
+            const COLORS = [
+                '#ff0000', '#0000ff', '#00ff00', '#ffa500', '#4b0082',
+                '#ee82ee', '#008080', '#800000', '#00ffff', '#ff1493',
+                '#00ff00', '#ff4500', '#8b4513', '#ffff00', '#0000ff',
+                '#808080', '#ff00ff', '#000000'
+            ];
+            return COLORS[index % COLORS.length];
+        }
 
         function updateChart() {
-            const selectedValues = Array.from(checkboxContainer.querySelectorAll('input[type="checkbox"]:checked'))
-                .map(checkbox => checkbox.value);
-            angleChart.data.datasets = selectedValues.map(value => ({
-                label: value,
-                data: [],
-                borderColor: getColor(value),
-            }));
+            const selectedKeys = Array.from(document.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+
+            // Remove datasets not in selected
+            angleChart.data.datasets = angleChart.data.datasets.filter(ds => selectedKeys.includes(ds.label));
+
+            // Add new datasets if needed
+            selectedKeys.forEach((key, index) => {
+                if (!angleChart.data.datasets.find(ds => ds.label === key)) {
+                    angleChart.data.datasets.push({
+                        label: key,
+                        data: [],
+                        borderColor: getColor(index),
+                        fill: false,
+                        tension: 0.1
+                    });
+                }
+            });
+
             angleChart.update();
         }
 
-        function getColor(value) {
-            switch (value) {
-                case 'angle': return 'rgba(255, 1, 1, 1)';
-                case 'accel_angle': return 'rgba(1, 1, 255, 1)';
-                case 'gyro_angle': return 'rgba(1, 255, 1, 1)';
-                case 'target_angle': return 'rgba(255, 165, 0, 1)';
-                case 'pp': return 'rgba(75, 0, 130, 1)';
-                case 'pi': return 'rgba(238, 130, 238, 1)';
-                case 'pd': return 'rgba(0, 128, 128, 1)';
-                case 'pos_output': return 'rgba(128, 0, 0, 1)';
-                case 'ap': return 'rgba(0, 255, 255, 1)';
-                case 'ai': return 'rgba(255, 20, 147, 1)';
-                case 'ad': return 'rgba(0, 255, 0, 1)';
-                case 'self.speed': return 'rgba(255, 69, 0, 1)';
-                case 'speed_output': return 'rgba(139, 69, 19, 1)';
-                case 'sp': return 'rgba(255, 255, 0, 1)';
-                case 'si': return 'rgba(0, 0, 255, 1)';
-                case 'sd': return 'rgba(128, 128, 128, 1)';
-                case 'avg_steps': return 'rgba(255, 0, 255, 1)';
-                case 'avg_steps_per_second': return 'rgba(0, 0, 0, 1)';
-                default: return 'rgba(0, 0, 0, 1)';
-            }
-        }
+        socket.on('data', function (dataWrapper) {
+            const data = dataWrapper.data || dataWrapper;
 
-        socket.on('data', function (data) {
-            updateCounter++;
-            if (updateCounter % 50 === 0) {
-                angleChart.data.labels.push(new Date().toLocaleTimeString());
-            } else {
-                angleChart.data.labels.push('');
-            }
+            angleChart.data.labels.push('');
 
             angleChart.data.datasets.forEach(dataset => {
-                const value = data[dataset.label.toLowerCase()];
-                if (value !== undefined) {
-                    dataset.data.push(value);
+                const val = data[dataset.label];
+                dataset.data.push(val !== undefined ? val : null);
+
+                if (dataset.data.length > maxDataPoints) {
+                    dataset.data.shift();
                 }
             });
 
             if (angleChart.data.labels.length > maxDataPoints) {
                 angleChart.data.labels.shift();
-                angleChart.data.datasets.forEach(dataset => dataset.data.shift());
             }
 
-            angleChart.update();
+            angleChart.update('none');
         });
 
+        document.getElementById('updateButton').addEventListener('click', updateChart);
         updateChart();
     </script>
 </body>

@@ -144,8 +144,8 @@ class BalancingRobot:
             # TODO: continue speed PID calibration
             if USE_SPEED_PID:
                 avg_steps_per_second = self._calculate_average_speed()
-                # self.speed_pid.set_setpoint(avg_steps_per_second)       # average speed in steps per second
-                self.speed_pid.set_setpoint(self.average_speed)       # average speed between -100 and 100
+                # self.speed_pid.set_setpoint(avg_steps_per_second)             # average speed in steps per second
+                self.speed_pid.set_setpoint(self.average_speed)                 # average speed between -100 and 100
                 speed_output, sp, si, sd = self.speed_pid.update(-(avg_steps/1000), dt)
                 target_angle = speed_output
             else:
