@@ -5,14 +5,6 @@
 
 This project showcases a self-balancing robot designed to demonstrate stability and control using two PID controllers. The first one maintains balance and the second one tries to return the robot to its starting point.
 
-<!-- ## Key Features
-----------------
-
-* **Autonomous Balancing**: Utilizes a MPU6050 to measure the robot's tilt angle and adjust the motors to maintain balance.
-* **Adjustable Control Algorithm**: Experiment with [PID, LQR, etc.] controllers for optimal performance
-* **Modular Design**: Easily integrate new sensors or actuators for expanded capabilities
-* **Cross-Platform Compatibility**: Designed to work with [list operating systems or platforms, if applicable] -->
-
 -------------------------------------
 ## Hardware & Software Requirements
 
@@ -29,15 +21,6 @@ This project showcases a self-balancing robot designed to demonstrate stability 
 *  smbus2
 *  numpy
 *  matplotlib
-
-<!-- ## Getting Started
--------------------
-
-1. **Cloning the Repository**: `git clone https://[your-repo-url].git`
-2. **Setup Your Environment**:
-	* Install [required software dependencies]
-	* Configure your [microcontroller/board] as per the included `README.setup` file
-3. **Upload and Test**: Follow `upload_instructions.md` for deploying the code to your robot -->
 
 -------------------------------------
 ## Setup Steps:
@@ -56,8 +39,7 @@ This project showcases a self-balancing robot designed to demonstrate stability 
 
 3. **Calibration**
    - Stand the robot upright at the angle at which it is in equilibrium
-   <!-- - Run the calibration script: `python calibration_script.py` -->
-   - Run the mpu's calibration function (calibrate_sensor(t), t in seconds)
+   - Run the MPU's calibration function (calibrate_sensor(t), t in seconds)
    - The MPU class has a function to set the digital lowpass filter and samplerate divisor according to the chosen time delay between measurements. (optimize_sample_settings(t), t in ms)
    - Adjust the PID values, which are at the top of the main.p file, to your liking. Higher values will result in more aggressive balancing attempts. Lower values will result in more subtle balancing attempts.
    **Note:** All settings, including PID values will be outsourced to  a config file in the future.

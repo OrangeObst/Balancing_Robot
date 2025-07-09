@@ -7,9 +7,12 @@ from multiprocessing import Process
 from util.lowpassfilter import LowPassFilter
 from util.udp_client import UdpClient
 from util.timed_task import TimedTask
+import os
 
 config = ConfigParser()
-config.read('/home/newPi/Desktop/Balancing_Robot/src/settings.ini')
+script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+config_file_path = os.path.join(script_dir, 'settings.ini')
+config.read(config_file_path)
 
 # Angle PID constants
 AP = config.getfloat('Angle_PID', 'AP')

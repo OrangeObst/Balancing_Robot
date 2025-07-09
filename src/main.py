@@ -4,17 +4,17 @@ from util.plot_graphs import Plotter
 from robot.MPU.MyMpu6050 import MyMPU6050
 from robot.pid_controller import PID_Controller
 from robot.stepper_motor import Stepper
-from robot.threaded_motors import ThreadedStepper
-# from codetiming import Timer
 from time import time
 from smbus2 import SMBus
 from configparser import ConfigParser
+import os
 
 # TODO: Implement low pass filter for the derivative term within the PID controller
-# I lose nearly 10% off of counter, motors don't turn properly and are louder than usual
 
 config = ConfigParser()
-config.read('/home/newPi/Desktop/Balancing_Robot/src/settings.ini')
+script_dir = os.path.dirname(os.path.abspath(__file__))
+config_file_path = os.path.join(script_dir, 'settings.ini')
+config.read(config_file_path)
 
 # Angle PID constants
 AP = config.getfloat('Angle_PID', 'AP')                 # 15
@@ -26,9 +26,6 @@ PP = config.getfloat('Position_PID', 'PP')              # 0.0005
 PI = config.getfloat('Position_PID', 'PI')              # 0.0
 PD = config.getfloat('Position_PID', 'PD')              # 0.0006
 USE_POS_PID = config.getboolean('Position_PID', 'USE_POS_PID')                      # De-/activate position PID controller
-MAX_TARGET_ANGLE = config.getfloat('Position_PID', 'MAX_TARGET_ANGLE')              # Max output for position PID controller
-FILTER_TARGET_ANGLE = config.getboolean('Position_PID', 'FILTER_TARGET_ANGLE')      # De-/activate filtering for target angle, could reduce instability
-                                                                                    # Has to be false if USE_POS_PID is False
 
 # Speed PID constants
 SP = config.getfloat('Speed_PID', 'SP')
@@ -42,12 +39,9 @@ TIMER = config.getfloat('Time', 'TIMER')                                        
 
 # Motor settings
 USE_MOTORS = config.getboolean('Motor', 'USE_MOTORS')                               # De-/activate motors
-USE_THREADED_MOTORS = config.getboolean('Motor', 'USE_THREADED_MOTORS')             # Threaded motors
 MICROSTEPS = config.getfloat('Motor', 'MICROSTEPS')                                 # Stepper motor HAT microstep setting
 
 # MPU settings
-COMPLEMENTARY_ALPHA = config.getfloat('MPU', 'COMPLEMENTARY_ALPHA')                 # Complementary filter for the accelerometer and gyroscope (MPU6050)
-FILTER_ACCEL_ANGLE = config.getboolean('MPU', 'FILTER_ACCEL_ANGLE')                 # De-/activate filtering for acceleration angle, increases reaction time
 AVERAGE_MPU_VALUES = config.getboolean('MPU', 'AVERAGE_MPU_VALUES')                 # De-/activate averaging for MPU samples over SAMPLE_TIME
 SAMPLE_TIME = config.getfloat('MPU', 'SAMPLE_TIME')                                 # MPUaverager sample time => DELAY / SAMPLE_TIME
 CALIBRATE = config.getboolean('MPU', 'CALIBRATE')                                   # True: MPU calibrates before every start, False: uses hardcoded offset
@@ -61,11 +55,18 @@ if __name__ == "__main__":
     # ----- MPU -----
     bus = SMBus(1)
     mpu = MyMPU6050(bus)
+
     if CALIBRATE:
-        mpu.calibrate_sensor(2)
+        mpu.calibrate_sensor(3)
     else:
-        mpu.set_accel_offset(0.081267, -0.019716, 0.101106)
-        mpu.set_gyro_offset(0.112204, 0.124888, 0.493542)
+        ax_offset = config.getfloat('MPU', 'AX_OFFSET')
+        ay_offset = config.getfloat('MPU', 'AY_OFFSET')
+        az_offset = config.getfloat('MPU', 'AZ_OFFSET')
+        gx_offset = config.getfloat('MPU', 'GX_OFFSET')
+        gy_offset = config.getfloat('MPU', 'GY_OFFSET')
+        gz_offset = config.getfloat('MPU', 'GZ_OFFSET')
+        mpu.set_accel_offset(ax_offset, ay_offset, az_offset)
+        mpu.set_gyro_offset(gx_offset, gy_offset, gz_offset)
 
     sample_time = SAMPLE_TIME if AVERAGE_MPU_VALUES else DELAY
     mpu.optimize_sample_settings(sample_time)

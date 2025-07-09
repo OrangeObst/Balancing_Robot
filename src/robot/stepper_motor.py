@@ -31,12 +31,10 @@ class Stepper:
         GPIO.setup(self.enable_pin, GPIO.OUT)
         GPIO.setup(self.mode_pins, GPIO.OUT)
 
-
     def _set_direction(self, direction):
         self.dx = 1 if direction == Stepper.CW else -1
         direction = not direction if self.invert_direction else direction
         GPIO.output(self.dir_pin, direction)
-
 
     def step(self):
         GPIO.output(self.step_pin, GPIO.HIGH)
@@ -58,23 +56,18 @@ class Stepper:
 
             self._set_direction(Stepper.CW if scaled_velocity > 0 else Stepper.CCW)
 
-
     def start(self):
         GPIO.output(self.enable_pin, GPIO.HIGH)
-
 
     def stop(self):
         GPIO.output(self.enable_pin, GPIO.LOW)
 
-    
     def shutdown(self):
         print("Cleaning up GPIO ...")
         GPIO.cleanup()
 
-
     def get_position(self):
         return self.steps
-
 
     def loop(self):
         now = time.time()

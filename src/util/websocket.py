@@ -8,23 +8,35 @@ class WebSocketServer:
         self.socketio = SocketIO(self.app)
         self.host = host
         self.port = port
+        self.server_thread = None
+        self.running = False
 
         @self.app.route('/')
         def index():
             return render_template('index.html')
 
     def start(self):
-        server_thread = threading.Thread(target=self._run_server)
-        server_thread.daemon = True  # Allows the program to exit even if the thread is still running
-        server_thread.start()
+        self.running = True
+        self.server_thread = threading.Thread(target=self._run_server)
+        self.server_thread.daemon = True  # Allows the program to exit even if the thread is still running
+        self.server_thread.start()
 
     def _run_server(self):
-        self.socketio.run(self.app, host=self.host, port=self.port)
+        while self.running:
+            self.socketio.run(self.app, host=self.host, port=self.port)
+
+    def stop(self):
+        self.running = False
 
     def emit_data(self, data):
         self.socketio.emit('data', data)
 
-
 if __name__ == '__main__':
     server = WebSocketServer()
-    server.start()
+    try:
+        server.start()
+        while True:
+            pass
+    except KeyboardInterrupt:
+        print("Stopping server...")
+        server.stop()

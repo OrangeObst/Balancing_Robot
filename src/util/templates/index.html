@@ -12,10 +12,46 @@
             height: 600px;
             overflow: hidden;
         }
+
+        #checkboxContainer {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        #checkboxContainer label {
+            display: block;
+            margin-left: 5px;
+        }
     </style>
 </head>
 
 <body>
+    <div id="checkboxContainer">
+        <div><input type="checkbox" value="angle" id="angle"><label for="angle">Angle</label></div>
+        <div><input type="checkbox" value="accel_angle" id="accel_angle"><label for="accel_angle">Accel Angle</label>
+        </div>
+        <div><input type="checkbox" value="gyro_angle" id="gyro_angle"><label for="gyro_angle">Gyro Angle</label></div>
+        <div><input type="checkbox" value="target_angle" id="target_angle"><label for="target_angle">Target
+                Angle</label></div>
+        <div><input type="checkbox" value="pp" id="pp"><label for="pp">PP</label></div>
+        <div><input type="checkbox" value="pi" id="pi"><label for="pi">PI</label></div>
+        <div><input type="checkbox" value="pd" id="pd"><label for="pd">PD</label></div>
+        <div><input type="checkbox" value="pos_output" id="pos_output"><label for="pos_output">Pos Output</label></div>
+        <div><input type="checkbox" value="ap" id="ap"><label for="ap">AP</label></div>
+        <div><input type="checkbox" value="ai" id="ai"><label for="ai">AI</label></div>
+        <div><input type="checkbox" value="ad" id="ad"><label for="ad">AD</label></div>
+        <div><input type="checkbox" value="self.speed" id="self.speed"><label for="self.speed">Self Speed</label></div>
+        <div><input type="checkbox" value="speed_output" id="speed_output"><label for="speed_output">Speed
+                Output</label></div>
+        <div><input type="checkbox" value="sp" id="sp"><label for="sp">SP</label></div>
+        <div><input type="checkbox" value="si" id="si"><label for="si">SI</label></div>
+        <div><input type="checkbox" value="sd" id="sd"><label for="sd">SD</label></div>
+        <div><input type="checkbox" value="avg_steps" id="avg_steps"><label for="avg_steps">Avg Steps</label></div>
+        <div><input type="checkbox" value="avg_steps_per_second" id="avg_steps_per_second"><label
+                for="avg_steps_per_second">Avg Steps Per Second</label></div>
+    </div><button id="updateButton">Update Chart</button>
     <div id="chartContainer"><canvas id="angleChart" width="1200" height="600"></canvas></div>
     <script>
         const ctx = document.getElementById('angleChart').getContext('2d');
@@ -23,22 +59,7 @@
             type: 'line',
             data: {
                 labels: [],
-                datasets: [{
-                    label: 'Angle',
-                    data: [],
-                    borderColor: 'rgba(255, 1, 1, 1)',
-                    borderWidth: 2
-                }, {
-                    label: 'Accel_angle',
-                    data: [],
-                    borderColor: 'rgba(1, 1, 255, 1)',
-                    borderWidth: 2
-                }, {
-                    label: 'Gyro_angle',
-                    data: [],
-                    borderColor: 'rgba(1, 255, 1, 1)',
-                    borderWidth: 2
-                }]
+                datasets: []
             },
             options: {
                 scales: {
@@ -53,6 +74,45 @@
         const socket = io();
         let updateCounter = 0;
         const maxDataPoints = 150;
+        const checkboxContainer = document.getElementById('checkboxContainer');
+        const updateButton = document.getElementById('updateButton');
+
+        updateButton.addEventListener('click', updateChart);
+
+        function updateChart() {
+            const selectedValues = Array.from(checkboxContainer.querySelectorAll('input[type="checkbox"]:checked'))
+                .map(checkbox => checkbox.value);
+            angleChart.data.datasets = selectedValues.map(value => ({
+                label: value,
+                data: [],
+                borderColor: getColor(value),
+            }));
+            angleChart.update();
+        }
+
+        function getColor(value) {
+            switch (value) {
+                case 'angle': return 'rgba(255, 1, 1, 1)';
+                case 'accel_angle': return 'rgba(1, 1, 255, 1)';
+                case 'gyro_angle': return 'rgba(1, 255, 1, 1)';
+                case 'target_angle': return 'rgba(255, 165, 0, 1)';
+                case 'pp': return 'rgba(75, 0, 130, 1)';
+                case 'pi': return 'rgba(238, 130, 238, 1)';
+                case 'pd': return 'rgba(0, 128, 128, 1)';
+                case 'pos_output': return 'rgba(128, 0, 0, 1)';
+                case 'ap': return 'rgba(0, 255, 255, 1)';
+                case 'ai': return 'rgba(255, 20, 147, 1)';
+                case 'ad': return 'rgba(0, 255, 0, 1)';
+                case 'self.speed': return 'rgba(255, 69, 0, 1)';
+                case 'speed_output': return 'rgba(139, 69, 19, 1)';
+                case 'sp': return 'rgba(255, 255, 0, 1)';
+                case 'si': return 'rgba(0, 0, 255, 1)';
+                case 'sd': return 'rgba(128, 128, 128, 1)';
+                case 'avg_steps': return 'rgba(255, 0, 255, 1)';
+                case 'avg_steps_per_second': return 'rgba(0, 0, 0, 1)';
+                default: return 'rgba(0, 0, 0, 1)';
+            }
+        }
 
         socket.on('data', function (data) {
             updateCounter++;
@@ -62,9 +122,12 @@
                 angleChart.data.labels.push('');
             }
 
-            angleChart.data.datasets[0].data.push(data.angle);
-            angleChart.data.datasets[1].data.push(data.accel_angle);
-            angleChart.data.datasets[2].data.push(data.gyro_angle);
+            angleChart.data.datasets.forEach(dataset => {
+                const value = data[dataset.label.toLowerCase()];
+                if (value !== undefined) {
+                    dataset.data.push(value);
+                }
+            });
 
             if (angleChart.data.labels.length > maxDataPoints) {
                 angleChart.data.labels.shift();
@@ -73,6 +136,8 @@
 
             angleChart.update();
         });
+
+        updateChart();
     </script>
 </body>
 

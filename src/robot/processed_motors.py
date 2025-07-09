@@ -1,6 +1,5 @@
 import multiprocessing
 import time
-# from codetiming import Timer
 
 class MultiprocessingStepper():
     def __init__(self, left_motor_motor, right_motor_motor):
@@ -15,10 +14,8 @@ class MultiprocessingStepper():
         self.right_motor_steps = multiprocessing.Value('i', 0)
         self.want_step_update_event = multiprocessing.Event()
         self.done_step_update_event = multiprocessing.Event()
-
         self.motor_loop_process = multiprocessing.Process(target=self._run)
 
-    # @Timer(name="run", text="Run: {milliseconds:6.4f} ms")
     def _run(self):
         while self.run_process.value:
             if self.velocity_update_event.is_set():
@@ -32,11 +29,9 @@ class MultiprocessingStepper():
                 self.done_step_update_event.set()
                 self.left_motor_steps.value = self.left_motor.get_position()
                 self.right_motor_steps.value = self.right_motor.get_position()
-
             self.left_motor.loop()
             self.right_motor.loop()
 
-    # @Timer(name="set_velocity", text="Set_velocity: {milliseconds:6.4f} ms")
     def set_velocity(self, left_motor_velocity=None, right_motor_velocity=None):
         if left_motor_velocity is not None:
             self.left_motor_velocity.value = left_motor_velocity

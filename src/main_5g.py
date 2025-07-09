@@ -11,12 +11,13 @@ from robot.threaded_motors import ThreadedStepper
 from time import time
 from smbus2 import SMBus
 from configparser import ConfigParser
+import os
 
-# TODO: Threaded motor implementation seems to be wrong. 
-# I lose nearly 10% off of counter, motors don't turn properly and are louder than usual
 
 config = ConfigParser()
-config.read('/home/newPi/Desktop/Balancing_Robot/src/settings.ini')
+script_dir = os.path.dirname(os.path.abspath(__file__))
+config_file_path = os.path.join(script_dir, 'settings.ini')
+config.read(config_file_path)
 
 # Angle PID constants
 AP = config.getfloat('Angle_PID', 'AP')                 # 15

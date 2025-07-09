@@ -106,7 +106,7 @@ class MyMPU6050:
         value = self.bus.read_byte_data(self.address, address)
         return value
 
-    def calibrate_sensor(self, duration=5):
+    def calibrate_sensor(self, duration=5) -> tuple[float, float, float, float, float, float]:
         print("Calibrating sensor, do not move the system")
         self.reset_mpu()
         self.set_register(_MPU6050_PWR_MGMT_1, 0x01)
@@ -159,6 +159,7 @@ class MyMPU6050:
         print("Setting offsets to: ")
         print(f'OFFSET AX, AY, AZ {self.AX_OFFSET:.6f}, {self.AY_OFFSET:.6f}, {self.AZ_OFFSET:.6f}')
         print(f'OFFSET GX, GY, GZ {self.GX_OFFSET:.6f}, {self.GY_OFFSET:.6f}, {self.GZ_OFFSET:.6f}')
+        return self.AX_OFFSET, self.AY_OFFSET, self.AZ_OFFSET, self.GX_OFFSET, self.GY_OFFSET, self.GZ_OFFSET
 
 
     def set_smplrt_div(self, bit_mask: int = 0x00):
