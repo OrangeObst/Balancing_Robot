@@ -9,7 +9,6 @@ from smbus2 import SMBus
 from configparser import ConfigParser
 import os
 
-# TODO: Implement low pass filter for the derivative term within the PID controller
 
 config = ConfigParser()
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -51,7 +50,6 @@ LOG_DATA = config.getboolean('Logging', 'LOG_DATA')                             
 
 
 if __name__ == "__main__":
-
     # ----- MPU -----
     bus = SMBus(1)
     mpu = MyMPU6050(bus)
@@ -98,9 +96,6 @@ if __name__ == "__main__":
     spr = 200 * MICROSTEPS
     left_motor = Stepper(dir_pin=13, step_pin=19, enable_pin=12, mode_pins=(16, 17, 20), microsteps=8)
     right_motor = Stepper(dir_pin=24, step_pin=18, enable_pin=4, mode_pins=(21, 22, 27), microsteps=8, invert_direction=True)
-    if USE_MOTORS:
-        left_motor.start()
-        right_motor.start()
 
     # ----- Logging -----
     data_collector = DataCollector()

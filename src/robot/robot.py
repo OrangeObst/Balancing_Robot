@@ -1,12 +1,11 @@
-from configparser import ConfigParser
-from math import degrees, atan2, sqrt
-import numpy as np
 from robot.processed_motors import MultiprocessingStepper
 from util.timed_task import TimedTask
 from util.lowpassfilter import LowPassFilter
 from util.websocket import WebSocketServer
-from time import time
 from util.udp_client import UdpClient
+from configparser import ConfigParser
+from math import degrees, atan2, sqrt
+from time import time
 import os
 
 config = ConfigParser()
@@ -57,6 +56,9 @@ class BalancingRobot:
         # Hardware
         self.left_motor = left_motor                        # Stepper Motor left
         self.right_motor = right_motor                      # Stepper Motor right
+        if USE_MOTORS:
+            self.left_motor.start()
+            self.right_motor.start()
         if USE_PROCESSED_MOTORS:
             self.process_motors = MultiprocessingStepper(self.left_motor, self.right_motor)
             self.process_motors.start()
@@ -75,7 +77,6 @@ class BalancingRobot:
 
         # Timed Tasks for static execution times
         self.control_loop_task = TimedTask(delay=DELAY, run=self._control_loop_handler)
-        self.collect_data_task = TimedTask(delay=SAMPLE_TIME, run=self._accumulate_sensor_data)
 
         self.previous_angle = 0.0
         self.speed = 0.0
@@ -164,18 +165,6 @@ class BalancingRobot:
                 # print(f'0: {data[0]:7.4f}, 1: {data[1]:7.4f}, 2: {data[2]:7.4f}, 3: {data[3]:7.4f}, 4: {data[4]:7.4f}, 5: {data[5]:7.4f}, Angle: {angle}')
                 # print(f'gx: {data[3]:6.4f} | gy: {data[4]:6.4f} | gz: {data[5]:6.4f} | Angle: {angle:6.4f}')
 
-    def _accumulate_sensor_data(self, now, dt):
-        tmp_data = self.mpu.get_all_data()
-        self.collected_data.append(tmp_data)
-        if len(self.collected_data) > 3:
-            self.collected_data.pop(0)
-
-    def _get_average_readings(self):
-        if len(self.collected_data) > 0:
-            avg_data = np.mean(self.collected_data, axis=0)
-            return avg_data
-        else:
-            return [0, 0, 0, 0, 0, 0]
 
     def _calculate_angle(self, data, dt):
         """Calculate angle from accelerometer and gyroscope data"""
@@ -248,11 +237,11 @@ class BalancingRobot:
 
     def _apply_motor_controls(self, speed):
         """Set motor velocities based on the calculated target velocity"""
-        if USE_PROCESSED_MOTORS:
-            self.process_motors.set_velocity(speed, speed)
-        else:
+        if USE_MOTORS:
             self.left_motor.set_velocity(speed)
             self.right_motor.set_velocity(speed)
+        elif USE_PROCESSED_MOTORS:
+            self.process_motors.set_velocity(speed, speed)
 
     def shutdown(self):
         if USE_PROCESSED_MOTORS:
@@ -315,8 +304,6 @@ class BalancingRobot:
 
     # @Timer(name="Main loop", text="Main loop: {milliseconds:.6f}ms")
     def loop(self):
-        if AVERAGE_MPU_VALUES:
-            self.collect_data_task.loop()
         self.control_loop_task.loop()
 
         if USE_MOTORS and not USE_PROCESSED_MOTORS:

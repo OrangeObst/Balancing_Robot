@@ -1,5 +1,4 @@
 import multiprocessing
-import numpy as np
 import time
 from configparser import ConfigParser
 from math import degrees, atan2, sqrt
