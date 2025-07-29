@@ -28,7 +28,7 @@ class Plotter:
         :param name: Name for the saved plot file
         """
         try:
-            fig, plts = plt.subplots(figsize=(10, 10))
+            _, plts = plt.subplots(figsize=(10, 10))
             smaller_value = min(len(p_terms), len(i_terms), len(d_terms))
             time_values = np.linspace(0, timer, smaller_value)
 
@@ -58,7 +58,7 @@ class Plotter:
         :param name: Name for the saved plot file
         """
         # try:
-        fig, plts = plt.subplots(2, 2, figsize=(12, 10))
+        _, plts = plt.subplots(2, 2, figsize=(12, 10))
         plts = [plts] if not isinstance(plts, np.ndarray) else plts
         plot_indices = [(0, 0), (0, 1), (1, 0), (1, 1)]
 
@@ -83,8 +83,6 @@ class Plotter:
                 local_y_lim = max(abs(lower_lim), abs(upper_lim))
                 if local_y_lim > 0:
                     plts[i, j].set_ylim(-local_y_lim, local_y_lim)
-                else:
-                    pass
 
         for (i, j), (label, values) in zip(plot_indices, pid_terms.items()):
             x = np.linspace(0, timer, len(values))
@@ -167,7 +165,7 @@ class Plotter:
         :param name: Name for the saved plot file
         """
         try:
-            fig, left_ax = plt.subplots(figsize=(6.4, 4.8))
+            _, left_ax = plt.subplots(figsize=(6.4, 4.8))
 
             if colors is None:
                 colors = ["#a2a2a2", "#4e4e4e", "#22e032"]

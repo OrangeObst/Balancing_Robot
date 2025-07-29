@@ -1,61 +1,40 @@
 import csv
-import os
-
+import time
 import numpy as np
-
+from pathlib import Path
 
 class DataCollector:
     def __init__(self):
-        self.data = {
-            'angle_pid_terms': {
-                'p_terms': [],
-                'i_terms': [],
-                'd_terms': [],
-                'output': []
-            },
-            'pos_pid_terms': {
-                'p_terms': [],
-                'i_terms': [],
-                'd_terms': [],
-                'output': []
-            },
-            'speed_pid_terms': {
-                'p_terms': [],
-                'i_terms': [],
-                'd_terms': [],
-                'output': []
-            }
-        }
+        self._data = {}
+        self._history = []
 
-        self.pid_key_map = {
-            'angle':    'angle_pid_terms',
-            'pos':      'pos_pid_terms',
-            'speed':    'speed_pid_terms'
-        }
+    def collect(self, **kwargs):
+        self._data.update(kwargs)
 
+    def snapshot(self):
+        self._history.append(self._data.copy())
+        self._data.clear()
 
-    def update_filename(self, filename):
-        self.data['filename'] = filename
+    def get_latest(self):
+        return self._history[-1] if self._history else {}
 
+    def get_all(self):
+        return self._history
 
-    def log_data(self, key, value):
-        self.data.setdefault(key, []).append(value)
+    def clear(self):
+        self._data.clear()
+        self._history.clear()
 
+    def emit(self, emitter):
+        if self._data:
+            emitter(self._data.copy())
+            self._data.clear()
 
-    def log_multiple_data(self, **kwargs):
-        for key, value in kwargs.items():
-            self.data.setdefault(key, []).append(value)
-
-
-    def log_pid_data(self, pid, p_terms, i_terms, d_terms, output):
-        if pid not in self.pid_key_map:
-            raise ValueError(f"Invalid pid: {pid}. Must be one of: {list(self.pid_key_map.keys())}")
-        
-        pid_key = self.pid_key_map[pid]
-        self.data[pid_key]['p_terms'].append(p_terms)
-        self.data[pid_key]['i_terms'].append(i_terms)
-        self.data[pid_key]['d_terms'].append(d_terms)
-        self.data[pid_key]['output'].append(output)
+    def log(self, logger):
+        if self._history:
+            for entry in self._history:
+                logger(entry)
+            self._history.clear()
 
 
     def print_averages(self):
@@ -79,35 +58,35 @@ class DataCollector:
                 except Exception as e:
                     print(f'oops: {e}')
                     print(key, data)
-            
-
-
-    def get_collected_data(self, var_name=None):
-        if var_name:
-            return self.data[var_name]
-        return dict(self.data)
     
+    def write_data_to_csv(self, destination_folder=None):
+        if destination_folder is None:
+            project_root = Path(__file__).resolve().parents[2]  # project/src/util -> go up 2
+            destination_folder = project_root / "Measurements"
+        else:
+            destination_folder = Path(destination_folder)
 
-    def _get_next_log_file_name(self, destination_folder='/home/newPi/Desktop/'):
-        # Ensure the destination folder exists
-        os.makedirs(destination_folder, exist_ok=True)
-        
-        base_name = "log_data_"
-        extension = ".csv"
-        i = 1
-        while os.path.exists(os.path.join(destination_folder, f"{base_name}{i}{extension}")):
-            i += 1
-        return os.path.join(destination_folder, f"{base_name}{i}{extension}")
-    
-    def write_timestamped_angles_to_csv(self, destination_folder='/home/newPi/Desktop/'):
-        filename = self._get_next_log_file_name(destination_folder)
+        destination_folder.mkdir(parents=True, exist_ok=True)
+
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        filename = destination_folder / f"log_data_{timestamp}.csv"
+
+        if not self._history:
+            print("No data to write.")
+            return
+
+        # Aggregate all keys for consistent header
+        all_keys = sorted({key for entry in self._history for key in entry})
+
         with open(filename, 'w', newline='') as csvfile:
-            csv_writer = csv.writer(csvfile)
-            csv_writer.writerow(['Milliseconds since start', 'Angle'])
-            for log in self.data['timestamped_angles']:
-                csv_writer.writerow(log)
+            writer = csv.DictWriter(csvfile, fieldnames=all_keys)
+            writer.writeheader()
+            for entry in self._history:
+                writer.writerow(entry)
+
+        print(f"Data written to {filename}")
 
 
 if __name__ == "__main__":
     collector = DataCollector()
-    print(collector._get_next_log_file_name('/home/newPi/Desktop/Balance_Bot/Stepper_Bot/Messungen'))
+

@@ -15,21 +15,11 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 config_file_path = os.path.join(script_dir, 'settings.ini')
 config.read(config_file_path)
 
-# Angle PID constants
-AP = config.getfloat('Angle_PID', 'AP')                 # 15
-AI = config.getfloat('Angle_PID', 'AI')                 # 0.01
-AD = config.getfloat('Angle_PID', 'AD')                 # 0.15
 
 # Position PID constants
-PP = config.getfloat('Position_PID', 'PP')              # 0.0005
-PI = config.getfloat('Position_PID', 'PI')              # 0.0
-PD = config.getfloat('Position_PID', 'PD')              # 0.0006
 USE_POS_PID = config.getboolean('Position_PID', 'USE_POS_PID')                      # De-/activate position PID controller
 
 # Speed PID constants
-SP = config.getfloat('Speed_PID', 'SP')
-SI = config.getfloat('Speed_PID', 'SI')
-SD = config.getfloat('Speed_PID', 'SD')
 USE_SPEED_PID = config.getboolean('Speed_PID', 'USE_SPEED_PID')
 
 # Time settings
@@ -41,7 +31,6 @@ USE_MOTORS = config.getboolean('Motor', 'USE_MOTORS')                           
 MICROSTEPS = config.getfloat('Motor', 'MICROSTEPS')                                 # Stepper motor HAT microstep setting
 
 # MPU settings
-AVERAGE_MPU_VALUES = config.getboolean('MPU', 'AVERAGE_MPU_VALUES')                 # De-/activate averaging for MPU samples over SAMPLE_TIME
 SAMPLE_TIME = config.getfloat('MPU', 'SAMPLE_TIME')                                 # MPUaverager sample time => DELAY / SAMPLE_TIME
 CALIBRATE = config.getboolean('MPU', 'CALIBRATE')                                   # True: MPU calibrates before every start, False: uses hardcoded offset
 
@@ -66,26 +55,26 @@ if __name__ == "__main__":
         mpu.set_accel_offset(ax_offset, ay_offset, az_offset)
         mpu.set_gyro_offset(gx_offset, gy_offset, gz_offset)
 
-    sample_time = SAMPLE_TIME if AVERAGE_MPU_VALUES else DELAY
+    sample_time = DELAY
     mpu.optimize_sample_settings(sample_time)
 
     # ----- PID -----
     min_velocity = -100
     max_velocity = 100
     angle_setpoint = 0.0
-    ap = AP
-    ai = AI
-    ad = AD
+    ap = config.getfloat('Angle_PID', 'AP')                 # 15
+    ai = config.getfloat('Angle_PID', 'AI')                 # 0.01
+    ad = config.getfloat('Angle_PID', 'AD')                 # 0.15
     position_setpoint = 0.0
     min_angle = -25.0
     max_angle = 25.0
-    pp = PP
-    pi = PI
-    pd = PD
+    pp = config.getfloat('Position_PID', 'PP')              # 0.0005
+    pi = config.getfloat('Position_PID', 'PI')              # 0.0
+    pd = config.getfloat('Position_PID', 'PD')              # 0.0006
     speed_setpoint = 0.0
-    sp = SP
-    si = SI
-    sd = SD
+    sp = config.getfloat('Speed_PID', 'SP')
+    si = config.getfloat('Speed_PID', 'SI')
+    sd = config.getfloat('Speed_PID', 'SD')
     delay = DELAY
 
     angle_pid = PID_Controller(ap, ai, ad, min_velocity, max_velocity, setpoint=angle_setpoint, alpha=0.5, deadband=0.4)
@@ -99,15 +88,14 @@ if __name__ == "__main__":
 
     # ----- Logging -----
     data_collector = DataCollector()
-    # data_collector.log_decorator_enabled = LOG_DATA
     
     # ----- Robot -----
     robot = BalancingRobot(
         left_motor = left_motor,
         right_motor = right_motor,
         mpu = mpu,
-        pid1 = pos_pid,
-        pid2 = angle_pid,
+        pid1 = angle_pid,
+        pid2 = pos_pid,
         pid3 = speed_pid,
         data_collector = data_collector
     )
@@ -119,8 +107,6 @@ if __name__ == "__main__":
             robot.loop()
     except KeyboardInterrupt:
         print("Interrupted")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
     finally:
         robot.shutdown()
         
@@ -145,7 +131,6 @@ if __name__ == "__main__":
             sd
         ]
 
-        # collected_data = data_collector.get_data()
         collected_data = data_collector.get_collected_data()
 
         plotter = Plotter(angle_pid_const, pos_pid_const, speed_pid_const)
@@ -162,4 +147,3 @@ if __name__ == "__main__":
             plotter.subplot_p_i_d_values('Speed', collected_data['speed_pid_terms'], TIMER, 100, unified_y_limit=False, name='Speed_PID_Terms')
         
         plotter.plot_angles([[collected_data['angle'],'Robot angle'], [collected_data['pos_pid_terms']['output'],'Target angle']], TIMER,  name='Angle_to_target_angle')
-        # plotter.plot_angles([[collected_data['accel_angles'],'Winkel aus Beschleunigungsdaten'], [collected_data['f_accel_angles'], 'Gefilterter Winkel'], [collected_data['gyro_angles'],'Winkel aus Gyroskopdaten']])

@@ -1,13 +1,10 @@
 from math import degrees, atan2, sqrt
 from robot.robot_5g import BalancingRobot5G
 from util.data_collector import DataCollector
-# from util.new_data_collector import DataCollector
 from util.plot_graphs import Plotter
 from robot.MPU.MyMpu6050 import MyMPU6050
 from robot.pid_controller import PID_Controller
 from robot.stepper_motor import Stepper
-from robot.threaded_motors import ThreadedStepper
-# from codetiming import Timer
 from time import time
 from smbus2 import SMBus
 from configparser import ConfigParser
@@ -45,7 +42,6 @@ TIMER = config.getfloat('Time', 'TIMER')                                        
 
 # Motor settings
 USE_MOTORS = config.getboolean('Motor', 'USE_MOTORS')                               # De-/activate motors
-USE_THREADED_MOTORS = config.getboolean('Motor', 'USE_THREADED_MOTORS')             # Threaded motors
 MICROSTEPS = config.getfloat('Motor', 'MICROSTEPS')                                 # Stepper motor HAT microstep setting
 
 # MPU settings
@@ -101,9 +97,6 @@ if __name__ == "__main__":
     left_motor = Stepper(dir_pin=13, step_pin=19, enable_pin=12, mode_pins=(16, 17, 20), microsteps=8)
     right_motor = Stepper(dir_pin=24, step_pin=18, enable_pin=4, mode_pins=(21, 22, 27), microsteps=8, invert_direction=True)
     if USE_MOTORS:
-        if USE_THREADED_MOTORS:
-            left_motor = ThreadedStepper(left_motor)
-            right_motor = ThreadedStepper(right_motor)
         left_motor.start()
         right_motor.start()
 
@@ -127,48 +120,11 @@ if __name__ == "__main__":
     try:
         while time() < timer:
             pass
+
     except KeyboardInterrupt:
         print("Interrupted")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
     finally:
         robot.shutdown()
         
         print("Exiting ...")
         print(f'Counter: {robot.counter}')
-
-
-    # if LOG_DATA:
-    #     angle_pid_const = [
-    #         ap,
-    #         ai,
-    #         ad
-    #     ]
-    #     pos_pid_const = [
-    #         pp,
-    #         pi,
-    #         pd
-    #     ]
-    #     speed_pid_const = [
-    #         sp,
-    #         si,
-    #         sd
-    #     ]
-
-    #     # collected_data = data_collector.get_data()
-    #     collected_data = data_collector.get_collected_data()
-
-    #     plotter = Plotter(angle_pid_const, pos_pid_const, speed_pid_const)
-    #     plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle'], 'Target angle': collected_data['pos_pid_terms']['output']}, TIMER, 'Steps', {'Steps': collected_data['avg_steps']})
-    #     plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle']}, TIMER, 'Speed', {'Speed': collected_data['angle_pid_terms']['output']}, name='Angle_to_Speed')        
-    #     plotter.plot_measurements('Accel', {'ax': collected_data['ax'], 'ay': collected_data['ay'], 'az': collected_data['az']}, TIMER, name="Accel_Data")
-    #     plotter.plot_measurements('Gyro', {'gx': collected_data['gx'], 'gy': collected_data['gy'], 'gz': collected_data['gz']}, TIMER, name="Gyro_Data")
-    #     plotter.plot_measurements('PD values', {'P terms': collected_data['angle_pid_terms']['p_terms'], 'D terms': collected_data['angle_pid_terms']['d_terms'], 'Output': collected_data['angle_pid_terms']['output']}, TIMER, name='PD graph')
-    #     plotter.subplot_p_i_d_values('Angle', collected_data['angle_pid_terms'], TIMER, 100, unified_y_limit=False, name='PID_Terms')
-    #     if USE_POS_PID:
-    #         plotter.subplot_p_i_d_values('Position', collected_data['pos_pid_terms'], TIMER, 100, unified_y_limit=False, name='PID_Terms')
-    #     if USE_SPEED_PID:
-    #         plotter.subplot_p_i_d_values('Speed', collected_data['speed_pid_terms'], TIMER, 100, unified_y_limit=False, name='PID_Terms')
-        
-    #     plotter.plot_angles([[collected_data['angle'],'Robot angle'], [collected_data['pos_pid_terms']['output'],'Target angle']], TIMER,  name='Angle_to_target_angle')
-    #     # plotter.plot_angles([[collected_data['accel_angles'],'Winkel aus Beschleunigungsdaten'], [collected_data['f_accel_angles'], 'Gefilterter Winkel'], [collected_data['gyro_angles'],'Winkel aus Gyroskopdaten']])

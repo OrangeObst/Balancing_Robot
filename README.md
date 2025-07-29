@@ -77,3 +77,14 @@ This project showcases a self-balancing robot designed to demonstrate stability 
 
 	+ **Outsource Control Logic**: Control algorithm shall be outsourced to another computer and communicate via  a network protocol (UDP, RTPS, Fast-DDS .. )
 
+------------------------------
+## Understanding the controlls 
+
+* **Planned behaviour**: The controlls are designed around the following design: 
+    Positive angle -> positive speed -> positive steps
+    
+    | Controller   | Input               | Setpoint               | Output               |
+    | ------------ | ------------------- | ---------------------- | -------------------- |
+    | Position PID | `-steps/1000`       | `average_speed`        | `desired tilt angle` |
+    | Angle PID    | `angle (from IMU)`  | `-position_pid_output` | `raw speed`          |
+    | Final Speed  | `-angle_pid_output` | —                      | `motor command`      |
