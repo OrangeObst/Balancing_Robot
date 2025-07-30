@@ -131,7 +131,7 @@ if __name__ == "__main__":
             sd
         ]
 
-        collected_data = data_collector.get_collected_data()
+        collected_data = data_collector.get_all()
 
         plotter = Plotter(angle_pid_const, pos_pid_const, speed_pid_const)
         plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle'], 'Target angle': collected_data['pos_pid_terms']['output']}, 'Steps', {'Steps': collected_data['avg_steps']}, TIMER, name='Angles_to_steps')

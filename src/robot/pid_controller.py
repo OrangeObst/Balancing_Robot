@@ -136,7 +136,7 @@ class PID_Controller(object):
         self.previous_input = input
         self.previous_dterm = dterm
 
-        # pterm, iterm und dterm sind nur zum plotten
+        # pterm, iterm and dterm are only returned for debugging purposes
         return (
             max(self.min_output, min(self.max_output, output)),
             max(self.min_output, min(self.max_output, pterm)),
@@ -146,18 +146,6 @@ class PID_Controller(object):
 
 
     def set_setpoint(self, setpoint):
-        """
-            Sets the new setpoint for the PID controller.
-
-            Args:
-                setpoint (float): The desired target value that the PID controller will aim to reach.
-
-            Returns:
-                None
-
-            This method updates the setpoint attribute, which serves as the target value for the control process.
-            The PID controller will adjust its output to minimize the difference between the current input and this setpoint.
-        """
         self.setpoint = setpoint
 
 

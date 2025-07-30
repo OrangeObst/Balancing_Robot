@@ -68,9 +68,32 @@ class BalancingRobot:
             self.process_motors = MultiprocessingStepper(self.left_motor, self.right_motor)
             self.process_motors.start()
 
+    # TODO: There might be an issue with the constants callback due to race conditions or timing issues.
+    def _set_pid_constants(self, constants):
+        if USE_POS_PID:
+            self.pos_pid.set_parameters(constants['Pp'], constants['Pi'], constants['Pd'])
+        elif USE_SPEED_PID:
+            self.speed_pid.set_parameters(constants['Sp'], constants['Si'], constants['Sd'])
+        self.angle_pid.set_parameters(constants['Ap'], constants['Ai'], constants['Ad'])
+
+    def _get_pid_constants(self):
+        return {
+            'Ap': self.angle_pid.kp,
+            'Ai': self.angle_pid.ki,
+            'Ad': self.angle_pid.kd,
+            'Pp': self.pos_pid.kp if USE_POS_PID else None,
+            'Pi': self.pos_pid.ki if USE_POS_PID else None,
+            'Pd': self.pos_pid.kd if USE_POS_PID else None,
+            'Sp': self.speed_pid.kp if USE_SPEED_PID else None,
+            'Si': self.speed_pid.ki if USE_SPEED_PID else None,
+            'Sd': self.speed_pid.kd if USE_SPEED_PID else None
+        }
+
     def _setup_comm(self):
         self.udp_client = UdpClient(BROKER, PORT)
-        self.server = WebSocketServer()
+        self.server = WebSocketServer(
+            constants_callback=self._set_pid_constants, 
+            constants_provider=self._get_pid_constants)
         self.server.start()
 
     def _setup_startup_state(self):

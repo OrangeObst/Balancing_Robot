@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>MPU6050 Visualization</title>
+    <title>5G robot</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/socket.io-client/dist/socket.io.js"></script>
     <style>
@@ -12,12 +12,42 @@
             margin: 20px;
         }
 
+        #topContainer {
+            display: flex;
+            gap: 30px;
+            max-width: 1600px;
+            margin-bottom: 10px;
+            font-size: small;
+        }
+
+        #leftSide {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        #rightSide {
+            flex: 1;
+            min-width: 300px;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        #constantsFormContainer {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            width: 100%;
+        }
+
+        #constantsFormContainer label {
+            margin-right: 5px;
+        }
+
         #checkboxContainer {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 10px;
-            max-width: 800px;
-            margin-bottom: 10px;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            width: 100%;
         }
 
         #checkboxContainer label {
@@ -29,6 +59,13 @@
             padding: 8px 16px;
             font-size: 14px;
             cursor: pointer;
+            position: relative;;
+        }
+
+        .updateButtonAlignment {
+            display: flex;
+            justify-content:baseline;
+            align-items: baseline;
         }
 
         .divider {
@@ -37,11 +74,18 @@
             margin: 20px 0;
         }
 
+        .vertical-divider {
+            width: 2px;
+            background-color: #ccc;
+            margin: 0 20px;
+            align-self: stretch;
+        }
+
         #chartContainer {
             position: relative;
             width: 100%;
             max-width: 1200px;
-            height: 60vh;
+            height: 600px;
         }
 
         canvas {
@@ -52,8 +96,35 @@
 </head>
 
 <body>
-    <div id="checkboxContainer"></div>
-    <button id="updateButton">Update Chart</button>
+    <div id="topContainer">
+        <div id="leftSide">
+            <h3>Trackable values</h3>
+            <div id="checkboxContainer"></div>
+            <div class="updateButtonAlignment">
+                <button type="button" id="updateButton">Update Chart</button>
+            </div>
+        </div>
+        <div class="vertical-divider"></div>
+        <div id="rightSide">
+            <h3>PID Constants</h3>
+            <form id="constantsForm">
+                <div id="constantsFormContainer">
+                    <div><label for="Ap">Ap</label><input type="text" id="Ap" name="Ap"></div>
+                    <div><label for="Ai">Ai</label><input type="text" id="Ai" name="Ai"></div>
+                    <div><label for="Ad">Ad</label><input type="text" id="Ad" name="Ad"></div>
+                    <div><label for="Pp">Pp</label><input type="text" id="Pp" name="Pp"></div>
+                    <div><label for="Pi">Pi</label><input type="text" id="Pi" name="Pi"></div>
+                    <div><label for="Pd">Pd</label><input type="text" id="Pd" name="Pd"></div>
+                    <div><label for="Sp">Sp</label><input type="text" id="Sp" name="Sp"></div>
+                    <div><label for="Si">Si</label><input type="text" id="Si" name="Si"></div>
+                    <div><label for="Sd">Sd</label><input type="text" id="Sd" name="Sd"></div>
+                </div>
+                <div class="updateButtonAlignment">
+                    <button type="button" id="updateButton">Send Constants</button>
+                </div>
+            </form>
+        </div>
+    </div>
     <div class="divider"></div>
     <div id="chartContainer">
         <canvas id="angleChart"></canvas>
@@ -61,16 +132,17 @@
 
     <script>
         const ALL_KEYS = [
-            "angle", "accel_angle", "gyro_angle", "target_angle",
-            "pp", "pi", "pd", "pos_output", "ap", "ai", "ad",
-            "speed", "speed_output", "sp", "si", "sd",
+            "angle", "ap", "pp", "sp",
+            "accel_angle", "ai", "pi", "si",
+            "gyro_angle", "ad", "pd", "sd",
+            "target_angle", "speed", "pos_output", "speed_output",
             "avg_steps", "avg_steps_per_second"
         ];
 
         const checkboxContainer = document.getElementById('checkboxContainer');
         ALL_KEYS.forEach(key => {
             const div = document.createElement('div');
-            div.innerHTML = `<input type="checkbox" value="${key}" id="${key}"><label for="${key}">${key}</label>`;
+            div.innerHTML = `<input type="checkbox" value="${key}" id="${key}"><label for="${key}">${key.charAt(0).toUpperCase() + key.slice(1)}</label>`;
             checkboxContainer.appendChild(div);
         });
 
@@ -98,6 +170,22 @@
         const socket = io();
         const maxDataPoints = 150;
 
+        document.getElementById('sendConstantsButton').addEventListener('click', function () {
+            const constants = {};
+            ['Ap', 'Ai', 'Ad', 'Pp', 'Pi', 'Pd', 'Sp', 'Si', 'Sd'].forEach(key => {
+                constants[key] = parseFloat(document.getElementById(key).value) || 0;
+            });
+            socket.emit('update_constants', constants);
+        });
+
+        socket.on('current_constants', function(constants) {
+            ['Ap', 'Ai', 'Ad', 'Pp', 'Pi', 'Pd', 'Sp', 'Si', 'Sd'].forEach(key => {
+                if (constants[key] !== undefined) {
+                    document.getElementById(key).value = constants[key];
+                }
+            });
+        });
+        
         function getColor(index) {
             const COLORS = [
                 '#ff0000', '#0000ff', '#00ff00', '#ffa500', '#4b0082',
