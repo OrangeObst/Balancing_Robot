@@ -3,7 +3,7 @@ from robot.robot_5g import BalancingRobot5G
 from util.data_collector import DataCollector
 from util.plot_graphs import Plotter
 from robot.MPU.MyMpu6050 import MyMPU6050
-from robot.pid_controller import PID_Controller
+from robot.pid_controller import PidController
 from robot.stepper_motor import Stepper
 from time import time
 from smbus2 import SMBus
@@ -88,9 +88,9 @@ if __name__ == "__main__":
     sd = SD
     delay = DELAY
 
-    angle_pid = PID_Controller(ap, ai, ad, min_velocity, max_velocity, setpoint=angle_setpoint, alpha=0.5, deadband=0.4)
-    pos_pid = PID_Controller(pp, pi, pd, min_angle, max_angle, position_setpoint)
-    speed_pid = PID_Controller(sp, si, sd, min_angle, max_angle, speed_setpoint)
+    angle_pid = PidController(ap, ai, ad, min_velocity, max_velocity, setpoint=angle_setpoint, alpha=0.5, deadband=0.4)
+    pos_pid = PidController(pp, pi, pd, min_angle, max_angle, position_setpoint)
+    speed_pid = PidController(sp, si, sd, min_angle, max_angle, speed_setpoint)
     
     # ----- Motor -----
     spr = 200 * MICROSTEPS

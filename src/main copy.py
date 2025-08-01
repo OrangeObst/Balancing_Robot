@@ -3,13 +3,10 @@ from queue import Queue
 from util.data_collector import DataCollector
 from util import timed_task, plot_graphs
 from robot.MPU.MyMpu6050 import MyMPU6050
-# from robot.mpu6050_copy import MyMPU6050
 from util.lowpassfilter import LowPassFilter
-from robot.pid_controller import PID_Controller
+from robot.pid_controller import PidController
 from robot.stepper_motor import Stepper
 from robot.MPU.MpuDataAverager import MpuDataAverager
-from robot.threaded_motors import ThreadedStepper
-# from codetiming import Timer
 from time import time
 from smbus2 import SMBus
 from configparser import ConfigParser
@@ -57,19 +54,14 @@ class BalancingRobot:
                  left_motor: Stepper, 
                  right_motor: Stepper, 
                  mpu: MyMPU6050, 
-                 pid1: PID_Controller, 
-                 pid2: PID_Controller,
+                 pid1: PidController, 
+                 pid2: PidController,
                  data_collector: DataCollector 
                 ):
         
         # Hardware
         self.left_motor = left_motor
         self.right_motor = right_motor
-        if USE_THREADED_MOTORS:
-            self.left_motor = ThreadedStepper(self.left_motor)
-            self.right_motor = ThreadedStepper(self.right_motor)
-            self.left_motor.start()     # Starts the left_motor thread
-            self.right_motor.start()    # Starts the right_motor thread
         self.mpu = mpu
 
         if AVERAGE_MPU_VALUES:
@@ -110,7 +102,6 @@ class BalancingRobot:
             data = self.mpudata_queue.get_nowait()
         else:
             data = self.mpu.get_all_data()
-            # TODO: compare values with all negative values and see what happens
     
         angle, accel_angle, gyro_angle = self._calculate_angle(data, dt)
         avg_steps = self._calculate_average_steps()
@@ -243,7 +234,6 @@ if __name__ == "__main__":
 
     # ----- MPU -----
     bus = SMBus(1)
-    # mpu = MyMPU6050(0x68)
     mpu = MyMPU6050(bus)
     if CALIBRATE:
         mpu.calibrate_sensor(2)
@@ -270,8 +260,8 @@ if __name__ == "__main__":
     pd = PD
     delay = DELAY
 
-    pos_pid = PID_Controller(pp, pi, pd, min_angle, max_angle, position_setpoint, pid_alpha)
-    angle_pid = PID_Controller(ap, ai, ad, min_velocity, max_velocity, angle_setpoint, pid_alpha)
+    pos_pid = PidController(pp, pi, pd, min_angle, max_angle, position_setpoint, pid_alpha)
+    angle_pid = PidController(ap, ai, ad, min_velocity, max_velocity, angle_setpoint, pid_alpha)
 
     # ----- Motor -----
     spr = 200 * MICROSTEPS

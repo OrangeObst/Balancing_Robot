@@ -1,4 +1,4 @@
-class PID_Controller(object):
+class PidController(object):
     """
         A PID (Proportional-Integral-Derivative) controller class used to compute 
         and adjust control outputs based on feedback from a measured process.
@@ -79,6 +79,16 @@ class PID_Controller(object):
             self.ki = i
         if d is not None:
             self.kd = d
+
+    def get_parameters(self):
+        """
+            Get the current PID controller parameters.
+        """
+        return {
+            'kp': self.kp,
+            'ki': self.ki,
+            'kd': self.kd,
+        }
 
 
     def update(self, input, dt):

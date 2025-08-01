@@ -2,7 +2,7 @@ from robot.robot import BalancingRobot
 from util.data_collector import DataCollector
 from util.plot_graphs import Plotter
 from robot.MPU.MyMpu6050 import MyMPU6050
-from robot.pid_controller import PID_Controller
+from robot.pid_controller import PidController
 from robot.stepper_motor import Stepper
 from time import time
 from smbus2 import SMBus
@@ -71,15 +71,10 @@ if __name__ == "__main__":
     pp = config.getfloat('Position_PID', 'PP')              # 0.0005
     pi = config.getfloat('Position_PID', 'PI')              # 0.0
     pd = config.getfloat('Position_PID', 'PD')              # 0.0006
-    speed_setpoint = 0.0
-    sp = config.getfloat('Speed_PID', 'SP')
-    si = config.getfloat('Speed_PID', 'SI')
-    sd = config.getfloat('Speed_PID', 'SD')
     delay = DELAY
 
-    angle_pid = PID_Controller(ap, ai, ad, min_velocity, max_velocity, setpoint=angle_setpoint, alpha=0.5, deadband=0.4)
-    pos_pid = PID_Controller(pp, pi, pd, min_angle, max_angle, position_setpoint)
-    speed_pid = PID_Controller(sp, si, sd, min_angle, max_angle, speed_setpoint)
+    angle_pid = PidController(ap, ai, ad, min_velocity, max_velocity, setpoint=angle_setpoint, alpha=0.5, deadband=0.4)
+    pos_pid = PidController(pp, pi, pd, min_angle, max_angle, position_setpoint)
     
     # ----- Motor -----
     spr = 200 * MICROSTEPS
@@ -96,7 +91,6 @@ if __name__ == "__main__":
         mpu = mpu,
         pid1 = angle_pid,
         pid2 = pos_pid,
-        pid3 = speed_pid,
         data_collector = data_collector
     )
 
@@ -143,7 +137,5 @@ if __name__ == "__main__":
         plotter.subplot_p_i_d_values('Angle', collected_data['angle_pid_terms'], TIMER, 100, unified_y_limit=False, name='Angle_PID_Terms')
         if USE_POS_PID:
             plotter.subplot_p_i_d_values('Position', collected_data['pos_pid_terms'], TIMER, 100, unified_y_limit=False, name='Position_PID_Terms')
-        if USE_SPEED_PID:
-            plotter.subplot_p_i_d_values('Speed', collected_data['speed_pid_terms'], TIMER, 100, unified_y_limit=False, name='Speed_PID_Terms')
         
         plotter.plot_angles([[collected_data['angle'],'Robot angle'], [collected_data['pos_pid_terms']['output'],'Target angle']], TIMER,  name='Angle_to_target_angle')

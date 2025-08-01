@@ -16,7 +16,6 @@ config.read(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 USE_POS_PID = config.getboolean('Position_PID', 'USE_POS_PID')
 MAX_TARGET_ANGLE = config.getfloat('Position_PID', 'MAX_TARGET_ANGLE')
 FILTER_TARGET_ANGLE = config.getboolean('Position_PID', 'FILTER_TARGET_ANGLE')
-USE_SPEED_PID = config.getboolean('Speed_PID', 'USE_SPEED_PID')
 DELAY = config.getfloat('Time', 'DELAY')
 USE_MOTORS = config.getboolean('Motor', 'USE_MOTORS')
 USE_PROCESSED_MOTORS = config.getboolean('Motor', 'USE_PROCESSED_MOTORS')
@@ -29,14 +28,13 @@ PORT = config.getint('Communication', 'PORT')
 
 
 class BalancingRobot:
-    def __init__(self, left_motor, right_motor, mpu, angle_pid, pos_pid, speed_pid, data_collector):
+    def __init__(self, left_motor, right_motor, mpu, angle_pid, pos_pid, data_collector):
         self.left_motor = left_motor
         self.right_motor = right_motor
         self.mpu = mpu
 
         self.angle_pid = angle_pid
         self.pos_pid = pos_pid
-        self.speed_pid = speed_pid
 
         self.data_collector = data_collector
         self.data_to_collect = {}
@@ -72,8 +70,6 @@ class BalancingRobot:
     def _set_pid_constants(self, constants):
         if USE_POS_PID:
             self.pos_pid.set_parameters(constants['Pp'], constants['Pi'], constants['Pd'])
-        elif USE_SPEED_PID:
-            self.speed_pid.set_parameters(constants['Sp'], constants['Si'], constants['Sd'])
         self.angle_pid.set_parameters(constants['Ap'], constants['Ai'], constants['Ad'])
 
     def _get_pid_constants(self):
@@ -84,9 +80,7 @@ class BalancingRobot:
             'Pp': self.pos_pid.kp if USE_POS_PID else None,
             'Pi': self.pos_pid.ki if USE_POS_PID else None,
             'Pd': self.pos_pid.kd if USE_POS_PID else None,
-            'Sp': self.speed_pid.kp if USE_SPEED_PID else None,
-            'Si': self.speed_pid.ki if USE_SPEED_PID else None,
-            'Sd': self.speed_pid.kd if USE_SPEED_PID else None
+
         }
 
     def _setup_comm(self):
@@ -176,14 +170,9 @@ class BalancingRobot:
             target = self.lpf_target_angle.filter(output) if FILTER_TARGET_ANGLE else output   
             target = max(-MAX_TARGET_ANGLE, min(MAX_TARGET_ANGLE, target))
             self.data_collector.collect(pos_pid_output=output, pp=pp, pi=pi, pd=pd, filtered_target_angle=target)
-        elif USE_SPEED_PID:
-            self.speed_pid.set_setpoint(self.average_speed)
-            output, sp, si, sd = self.speed_pid.update(-(steps / 1000), dt)
-            target = output
-            self.data_collector.collect(speed_pid_output=output, sp=sp, si=si, sd=sd)
         else:
             target = 0.0
-        target = -target                # Hard to explain
+        # target = -target
         self.data_collector.collect(target_angle=target)
         return target
 
