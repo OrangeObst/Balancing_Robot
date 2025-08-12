@@ -89,8 +89,8 @@ if __name__ == "__main__":
         left_motor = left_motor,
         right_motor = right_motor,
         mpu = mpu,
-        pid1 = angle_pid,
-        pid2 = pos_pid,
+        angle_pid = angle_pid,
+        pos_pid = pos_pid,
         data_collector = data_collector
     )
 
@@ -119,15 +119,10 @@ if __name__ == "__main__":
             pi,
             pd
         ]
-        speed_pid_const = [
-            sp,
-            si,
-            sd
-        ]
 
         collected_data = data_collector.get_all()
 
-        plotter = Plotter(angle_pid_const, pos_pid_const, speed_pid_const)
+        plotter = Plotter(angle_pid_const, pos_pid_const)
         plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle'], 'Target angle': collected_data['pos_pid_terms']['output']}, 'Steps', {'Steps': collected_data['avg_steps']}, TIMER, name='Angles_to_steps')
         plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle']}, 'Speed', {'Speed': collected_data['angle_pid_terms']['output']}, TIMER, name='Angle_to_Speed')        
         plotter.plot_measurements('Angles [°]', {'Accel angle': collected_data['accel_angle'], 'Gyro angle': collected_data['gyro_angle']}, TIMER, name='Accel_Gyro_angles')

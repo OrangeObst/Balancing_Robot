@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>5G robot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MPU6050 Visualization</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/socket.io-client/dist/socket.io.js"></script>
     <style>
@@ -16,7 +17,7 @@
             display: flex;
             gap: 30px;
             max-width: 1600px;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             font-size: small;
         }
 
@@ -54,17 +55,18 @@
             margin-left: 5px;
         }
 
-        #updateButton {
+        .updateButton {
             margin: 10px 0;
             padding: 8px 16px;
             font-size: 14px;
             cursor: pointer;
-            position: relative;;
+            position: relative;
+            ;
         }
 
         .updateButtonAlignment {
             display: flex;
-            justify-content:baseline;
+            justify-content: baseline;
             align-items: baseline;
         }
 
@@ -100,28 +102,23 @@
         <div id="leftSide">
             <h3>Trackable values</h3>
             <div id="checkboxContainer"></div>
-            <div class="updateButtonAlignment">
-                <button type="button" id="updateButton">Update Chart</button>
-            </div>
+            <div class="updateButtonAlignment"><button type="button" id="updateChartButton" class="updateButton">Update
+                    Chart</button></div>
         </div>
         <div class="vertical-divider"></div>
         <div id="rightSide">
             <h3>PID Constants</h3>
             <form id="constantsForm">
                 <div id="constantsFormContainer">
-                    <div><label for="Ap">Ap</label><input type="text" id="Ap" name="Ap"></div>
-                    <div><label for="Ai">Ai</label><input type="text" id="Ai" name="Ai"></div>
-                    <div><label for="Ad">Ad</label><input type="text" id="Ad" name="Ad"></div>
-                    <div><label for="Pp">Pp</label><input type="text" id="Pp" name="Pp"></div>
-                    <div><label for="Pi">Pi</label><input type="text" id="Pi" name="Pi"></div>
-                    <div><label for="Pd">Pd</label><input type="text" id="Pd" name="Pd"></div>
-                    <div><label for="Sp">Sp</label><input type="text" id="Sp" name="Sp"></div>
-                    <div><label for="Si">Si</label><input type="text" id="Si" name="Si"></div>
-                    <div><label for="Sd">Sd</label><input type="text" id="Sd" name="Sd"></div>
+                    <div><label for="ap">Ap</label><input type="text" id="ap" name="Ap"></div>
+                    <div><label for="ai">Ai</label><input type="text" id="ai" name="Ai"></div>
+                    <div><label for="ad">Ad</label><input type="text" id="ad" name="Ad"></div>
+                    <div><label for="pp">Pp</label><input type="text" id="pp" name="Pp"></div>
+                    <div><label for="pi">Pi</label><input type="text" id="pi" name="Pi"></div>
+                    <div><label for="pd">Pd</label><input type="text" id="pd" name="Pd"></div>
                 </div>
-                <div class="updateButtonAlignment">
-                    <button type="button" id="updateButton">Send Constants</button>
-                </div>
+                <div class="updateButtonAlignment"><button type="button" id="sendConstantsButton"
+                        class="updateButton">Send Constants</button></div>
             </form>
         </div>
     </div>
@@ -132,17 +129,16 @@
 
     <script>
         const ALL_KEYS = [
-            "angle", "ap", "pp", "sp",
-            "accel_angle", "ai", "pi", "si",
-            "gyro_angle", "ad", "pd", "sd",
-            "target_angle", "speed", "pos_output", "speed_output",
+            "angle", "accel_angle", "gyro_angle", "target_angle",
+            "a_pterm", "a_iterm", "a_dterm", "speed",
+            "p_pterm", "p_iterm", "p_dterm", "pos_output",
             "avg_steps", "avg_steps_per_second"
         ];
 
         const checkboxContainer = document.getElementById('checkboxContainer');
         ALL_KEYS.forEach(key => {
             const div = document.createElement('div');
-            div.innerHTML = `<input type="checkbox" value="${key}" id="${key}"><label for="${key}">${key.charAt(0).toUpperCase() + key.slice(1)}</label>`;
+            div.innerHTML = `<input type="checkbox" value="${key}" id="${key}"><label for="${key}">${key}</label>`;
             checkboxContainer.appendChild(div);
         });
 
@@ -170,22 +166,6 @@
         const socket = io();
         const maxDataPoints = 150;
 
-        document.getElementById('sendConstantsButton').addEventListener('click', function () {
-            const constants = {};
-            ['Ap', 'Ai', 'Ad', 'Pp', 'Pi', 'Pd', 'Sp', 'Si', 'Sd'].forEach(key => {
-                constants[key] = parseFloat(document.getElementById(key).value) || 0;
-            });
-            socket.emit('update_constants', constants);
-        });
-
-        socket.on('current_constants', function(constants) {
-            ['Ap', 'Ai', 'Ad', 'Pp', 'Pi', 'Pd', 'Sp', 'Si', 'Sd'].forEach(key => {
-                if (constants[key] !== undefined) {
-                    document.getElementById(key).value = constants[key];
-                }
-            });
-        });
-        
         function getColor(index) {
             const COLORS = [
                 '#ff0000', '#0000ff', '#00ff00', '#ffa500', '#4b0082',
@@ -203,7 +183,7 @@
             angleChart.data.datasets = angleChart.data.datasets.filter(ds => selectedKeys.includes(ds.label));
 
             // Add new datasets if needed
-            selectedKeys.forEach((key, index) => {
+            selectedKeys.forEach((key, index) => {                
                 if (!angleChart.data.datasets.find(ds => ds.label === key)) {
                     angleChart.data.datasets.push({
                         label: key,
@@ -239,7 +219,23 @@
             angleChart.update('none');
         });
 
-        document.getElementById('updateButton').addEventListener('click', updateChart);
+        socket.on('current_constants', function(constants) {
+            ['ap', 'ai', 'ad', 'pp', 'pi', 'pd'].forEach(key => {
+                if (constants[key] !== undefined) {
+                    document.getElementById(key).value = constants[key];
+                }
+            });
+        });
+
+        document.getElementById('sendConstantsButton').addEventListener('click', function () {
+            const constants = {};
+            ['ap', 'ai', 'ad', 'pp', 'pi', 'pd'].forEach(key => {
+                constants[key] = parseFloat(document.getElementById(key).value) || 0;
+            });
+            socket.emit('update_constants', constants);
+        });
+
+        document.getElementById('updateChartButton').addEventListener('click', updateChart);
         updateChart();
     </script>
 </body>

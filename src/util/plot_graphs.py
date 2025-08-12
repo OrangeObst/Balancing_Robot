@@ -2,20 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 class Plotter:
-    def __init__(self, apid, ppid, spid):
-        """
-        Initialize the Plotter with PID constants for angle and position.
-
-        :param apid: List of PID constants for angle [P, I, D]
-        :param ppid: List of PID constants for position [P, I, D]
-        """
-        self.pid_constants = {
-            'Angle': {'P': apid[0], 'I': apid[1], 'D': apid[2]},
-            'Position': {'P': ppid[0], 'I': ppid[1], 'D': ppid[2]},
-            'Speed': {'P': spid[0], 'I': spid[1], 'D': spid[2]}
-        }
-        self.title = f"(AP={apid[0]}, AI={apid[1]}, AD={apid[2]}, PP={ppid[0]}, PI={ppid[1]}, PD={ppid[2]})"
-        self.color_cycle = plt.cm.tab20.colors
+    def __init__(self):
+        pass
 
     def stackplot_pid_values(self, p_terms, i_terms, d_terms, timer, name="PID_stackplot"):
         """

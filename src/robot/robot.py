@@ -69,17 +69,17 @@ class BalancingRobot:
     # TODO: There might be an issue with the constants callback due to race conditions or timing issues.
     def _set_pid_constants(self, constants):
         if USE_POS_PID:
-            self.pos_pid.set_parameters(constants['Pp'], constants['Pi'], constants['Pd'])
-        self.angle_pid.set_parameters(constants['Ap'], constants['Ai'], constants['Ad'])
+            self.pos_pid.set_parameters(constants['pp'], constants['pi'], constants['pd'])
+        self.angle_pid.set_parameters(constants['ap'], constants['ai'], constants['ad'])
 
     def _get_pid_constants(self):
         return {
-            'Ap': self.angle_pid.kp,
-            'Ai': self.angle_pid.ki,
-            'Ad': self.angle_pid.kd,
-            'Pp': self.pos_pid.kp if USE_POS_PID else None,
-            'Pi': self.pos_pid.ki if USE_POS_PID else None,
-            'Pd': self.pos_pid.kd if USE_POS_PID else None,
+            'ap': self.angle_pid.kp,
+            'ai': self.angle_pid.ki,
+            'ad': self.angle_pid.kd,
+            'pp': self.pos_pid.kp if USE_POS_PID else None,
+            'pi': self.pos_pid.ki if USE_POS_PID else None,
+            'pd': self.pos_pid.kd if USE_POS_PID else None,
 
         }
 
@@ -166,10 +166,10 @@ class BalancingRobot:
     def _get_target_angle(self, steps, dt):
         if USE_POS_PID:
             self.pos_pid.set_setpoint(self.average_speed)
-            output, pp, pi, pd = self.pos_pid.update(-steps/1000, dt)
+            output, p_pterm, p_iterm, p_dterm = self.pos_pid.update(-steps/1000, dt)
             target = self.lpf_target_angle.filter(output) if FILTER_TARGET_ANGLE else output   
             target = max(-MAX_TARGET_ANGLE, min(MAX_TARGET_ANGLE, target))
-            self.data_collector.collect(pos_pid_output=output, pp=pp, pi=pi, pd=pd, filtered_target_angle=target)
+            self.data_collector.collect(pos_pid_output=output, p_pterm=p_pterm, p_iterm=p_iterm, p_dterm=p_dterm, filtered_target_angle=target)
         else:
             target = 0.0
         # target = -target
@@ -178,9 +178,9 @@ class BalancingRobot:
 
     def _update_angle_pid(self, target, angle, dt):
         self.angle_pid.set_setpoint(target)
-        output, ap, ai, ad = self.angle_pid.update(angle, dt)
+        output, a_pterm, a_iterm, a_dterm = self.angle_pid.update(angle, dt)
         speed = -output                 # Invert output for motor control: Positive angle -> positive speed
-        self.data_collector.collect(angle_pid_output=output, ap=ap, ai=ai, ad=ad)
+        self.data_collector.collect(angle_pid_output=output, a_pterm=a_pterm, a_iterm=a_iterm, a_dterm=a_dterm)
         return speed
 
     def _apply_motor_speed(self, speed):

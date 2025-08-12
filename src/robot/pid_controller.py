@@ -160,7 +160,7 @@ class PidController(object):
 
 
 if __name__ == "__main__":
-    pid = PID_Controller(10, 0.4, 0.2, -100, 100, 0.0, 0.5)
+    pid = PidController(10, 0.4, 0.2, -100, 100, 0.0, 0.5)
     dt = 0.01
     print(pid.update(1, dt))
     print(pid.update(2, dt))

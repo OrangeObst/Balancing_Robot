@@ -1,2 +1,4 @@
 .venv/*
-src/util/__pycache__/*
+**/__pycache__/*
+*.pyc
+src/robot/MPU/__pycache__/MyMpu6050.cpython-311.pyc
