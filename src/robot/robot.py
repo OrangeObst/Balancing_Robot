@@ -1,12 +1,12 @@
-from robot.processed_motors import MultiprocessingStepper
+import os
+from time import time
+from math import degrees, atan2, sqrt
+from configparser import ConfigParser
+from network.udp_client import UdpClient
+from network.websocket import WebsocketClient
 from util.timed_task import TimedTask
 from util.lowpassfilter import LowPassFilter
-from util.websocket import WebSocketServer
-from util.udp_client import UdpClient
-from configparser import ConfigParser
-from math import degrees, atan2, sqrt
-from time import time
-import os
+from robot.processed_motors import MultiprocessingStepper
 
 # === Configuration Loading ===
 config = ConfigParser()
@@ -80,12 +80,11 @@ class BalancingRobot:
             'pp': self.pos_pid.kp if USE_POS_PID else None,
             'pi': self.pos_pid.ki if USE_POS_PID else None,
             'pd': self.pos_pid.kd if USE_POS_PID else None,
-
         }
 
     def _setup_comm(self):
         self.udp_client = UdpClient(BROKER, PORT)
-        self.server = WebSocketServer(
+        self.server = WebsocketClient(
             constants_callback=self._set_pid_constants, 
             constants_provider=self._get_pid_constants)
         self.server.start()
@@ -196,4 +195,3 @@ class BalancingRobot:
         else:
             self.left_motor.shutdown()
             self.right_motor.shutdown()
-        self.server.stop()

@@ -3,8 +3,7 @@ import multiprocessing
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.util.udp_client import UdpClient
-from src.util.processsafe_list import ProcessSafeList
+from network.udp_client import UdpClient
 from src.util.timed_task import TimedTask
 
 BROKER = '10.224.64.29'

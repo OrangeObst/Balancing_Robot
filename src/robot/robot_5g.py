@@ -4,7 +4,7 @@ from configparser import ConfigParser
 from math import degrees, atan2, sqrt
 from multiprocessing import Process
 from util.lowpassfilter import LowPassFilter
-from util.udp_client import UdpClient
+from network.udp_client import UdpClient
 from util.timed_task import TimedTask
 import os
 

@@ -117,8 +117,11 @@
                     <div><label for="pi">Pi</label><input type="text" id="pi" name="Pi"></div>
                     <div><label for="pd">Pd</label><input type="text" id="pd" name="Pd"></div>
                 </div>
-                <div class="updateButtonAlignment"><button type="button" id="sendConstantsButton"
-                        class="updateButton">Send Constants</button></div>
+                <div class="updateButtonAlignment">
+                    <button type="button" id="sendConstantsButton" class="updateButton">Send Constants</button>
+                    <button type="button" id="startRobotButton" class="updateButton">Start Robot</button>
+                    <button type="button" id="stopRobotButton" class="updateButton">Stop Robot</button>
+                </div>
             </form>
         </div>
     </div>
@@ -163,7 +166,7 @@
             }
         });
 
-        const socket = io();
+        const socket = io('/client');
         const maxDataPoints = 150;
 
         function getColor(index) {
@@ -225,6 +228,23 @@
                     document.getElementById(key).value = constants[key];
                 }
             });
+        });
+
+        socket.on('robot_status', function (status) {
+            if (status.running) {
+                document.getElementById('startRobotButton').disabled = true;
+                document.getElementById('stopRobotButton').disabled = false;
+            } else {
+                document.getElementById('startRobotButton').disabled = false;
+                document.getElementById('stopRobotButton').disabled = true;
+            }
+        });
+
+        document.getElementById('startRobotButton').addEventListener('click', function () {
+            socket.emit('start_robot');
+        });
+        document.getElementById('stopRobotButton').addEventListener('click', function () {
+            socket.emit('stop_robot');
         });
 
         document.getElementById('sendConstantsButton').addEventListener('click', function () {
