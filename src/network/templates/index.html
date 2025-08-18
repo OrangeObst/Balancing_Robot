@@ -35,7 +35,7 @@
 
         #constantsFormContainer {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 15px;
             width: 100%;
         }
@@ -55,13 +55,18 @@
             margin-left: 5px;
         }
 
+        .pidGroup {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
         .updateButton {
-            margin: 10px 0;
+            margin: 10px 5px;
             padding: 8px 16px;
             font-size: 14px;
             cursor: pointer;
             position: relative;
-            ;
         }
 
         .updateButtonAlignment {
@@ -110,12 +115,8 @@
             <h3>PID Constants</h3>
             <form id="constantsForm">
                 <div id="constantsFormContainer">
-                    <div><label for="ap">Ap</label><input type="text" id="ap" name="Ap"></div>
-                    <div><label for="ai">Ai</label><input type="text" id="ai" name="Ai"></div>
-                    <div><label for="ad">Ad</label><input type="text" id="ad" name="Ad"></div>
-                    <div><label for="pp">Pp</label><input type="text" id="pp" name="Pp"></div>
-                    <div><label for="pi">Pi</label><input type="text" id="pi" name="Pi"></div>
-                    <div><label for="pd">Pd</label><input type="text" id="pd" name="Pd"></div>
+                    <div id="anglePIDGroup" class="pidGroup"></div>
+                    <div id="positionPIDGroup" class="pidGroup"></div>
                 </div>
                 <div class="updateButtonAlignment">
                     <button type="button" id="sendConstantsButton" class="updateButton">Send Constants</button>
@@ -131,6 +132,8 @@
     </div>
 
     <script>
+        window.onload = function () { initElements() };
+
         const ALL_KEYS = [
             "angle", "accel_angle", "gyro_angle", "target_angle",
             "a_pterm", "a_iterm", "a_dterm", "speed",
@@ -169,6 +172,98 @@
         const socket = io('/client');
         const maxDataPoints = 150;
 
+        function initElements() {
+            const angleKeys = [
+                { key: 'ap', label: 'Angle P', min: 0.1, max: 15, step: 0.1 },
+                { key: 'ai', label: 'Angle I', min: 0, max: 5, step: 0.01 },
+                { key: 'ad', label: 'Angle D', min: 0, max: 0.3, step: 0.001 }
+            ];
+            const angleGroup = document.getElementById('anglePIDGroup');
+            angleKeys.forEach(cfg => {
+                const div = document.createElement('div');
+                createSlider(div, cfg.label, cfg.min, cfg.max, cfg.step, cfg.key);
+                angleGroup.appendChild(div);
+            });
+
+            const positionKeys = [
+                { key: 'pp', label: 'Position P', min: 0.1, max: 15, step: 0.1 },
+                { key: 'pi', label: 'Position I', min: 0, max: 5, step: 0.01 },
+                { key: 'pd', label: 'Position D', min: 0, max: 0.3, step: 0.001 }
+            ];
+            const positionGroup = document.getElementById('positionPIDGroup');
+            positionKeys.forEach(cfg => {
+                const div = document.createElement('div');
+                createSlider(div, cfg.label, cfg.min, cfg.max, cfg.step, cfg.key);
+                positionGroup.appendChild(div);
+            });
+        }
+
+        function createSlider(div, name, min, max, stp, key) {
+            div.className = "sliderGroup";
+
+            var lbl = document.createElement("label");
+            lbl.innerHTML = name;
+            lbl.className = "nameLabel";
+            div.appendChild(lbl);
+
+            var btnMinus = document.createElement("button");
+            btnMinus.type = "button";
+            btnMinus.className = "btnAdj";
+            btnMinus.innerHTML = '-';
+            btnMinus.onclick = function () { changeValue(btnMinus, -1); };
+            div.appendChild(btnMinus);
+
+            var slider = document.createElement('input');
+            slider.id = "slider_" + key;
+            slider.type = 'range';
+            slider.className = "slider";
+            slider.min = min;
+            slider.max = max;
+            slider.step = stp;
+            slider.value = (max - min) / 2;
+            slider.oninput = function () { changeValue(btnMinus, 0); };
+            div.appendChild(slider);
+
+            var btnPlus = document.createElement("button");
+            btnPlus.type = "button";
+            btnPlus.className = "btnAdj";
+            btnPlus.innerHTML = '+';
+            btnPlus.onclick = function () { changeValue(btnPlus, 1); };
+            div.appendChild(btnPlus);
+
+            var valueLabel = document.createElement("label");
+            valueLabel.id = "label_" + key;
+            valueLabel.innerHTML = slider.value;
+            valueLabel.className = "valueLabel";
+            div.appendChild(valueLabel);
+        }
+
+        function changeValue(e, dir) {
+            d = e.parentNode;
+            s = d.getElementsByClassName("slider")[0];
+            l = d.getElementsByClassName("valueLabel")[0];
+            s.value = Number(s.value) + (dir * s.step);
+            l.innerHTML = Number(s.value).toFixed(3);
+            var cmd = d.getAttribute('command');
+        }
+
+        function setValue(d, val) {
+            s = d.getElementsByClassName("slider")[0];
+            l = d.getElementsByClassName("valueLabel")[0];
+            s.value = val;
+            l.innerHTML = Number(val).toFixed(3);
+        }
+
+        function parseValue(cmd, val) {
+            d = document.getElementsByClassName("sliderGroup");
+            for (var i = 0; i < d.length; i++) {
+                if (d[i].getAttribute('command') == cmd) {
+                    setValue(d[i], val);
+                    return;
+                }
+            }
+        }
+
         function getColor(index) {
             const COLORS = [
                 '#ff0000', '#0000ff', '#00ff00', '#ffa500', '#4b0082',
@@ -186,7 +281,7 @@
             angleChart.data.datasets = angleChart.data.datasets.filter(ds => selectedKeys.includes(ds.label));
 
             // Add new datasets if needed
-            selectedKeys.forEach((key, index) => {                
+            selectedKeys.forEach((key, index) => {
                 if (!angleChart.data.datasets.find(ds => ds.label === key)) {
                     angleChart.data.datasets.push({
                         label: key,
@@ -222,10 +317,13 @@
             angleChart.update('none');
         });
 
-        socket.on('current_constants', function(constants) {
-            ['ap', 'ai', 'ad', 'pp', 'pi', 'pd'].forEach(key => {
-                if (constants[key] !== undefined) {
-                    document.getElementById(key).value = constants[key];
+        socket.on('pid_constants', function (constants) {
+            Object.keys(constants).forEach(function (key) {
+                var slider = document.getElementById("slider_" + key);
+                var label = document.getElementById("label_" + key);
+                if (slider && label) {
+                    slider.value = constants[key];
+                    label.innerHTML = Number(constants[key]).toFixed(3);
                 }
             });
         });
@@ -250,7 +348,7 @@
         document.getElementById('sendConstantsButton').addEventListener('click', function () {
             const constants = {};
             ['ap', 'ai', 'ad', 'pp', 'pi', 'pd'].forEach(key => {
-                constants[key] = parseFloat(document.getElementById(key).value) || 0;
+                constants[key] = parseFloat(document.getElementById("slider_" + key).value) || 0;
             });
             socket.emit('update_constants', constants);
         });

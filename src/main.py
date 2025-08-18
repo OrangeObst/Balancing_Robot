@@ -1,3 +1,4 @@
+from network.websocket import WebsocketClient
 from robot.robot import BalancingRobot
 from util.data_collector import DataCollector
 from util.plot_graphs import Plotter
@@ -93,6 +94,15 @@ if __name__ == "__main__":
         pos_pid = pos_pid,
         data_collector = data_collector
     )
+
+    # TODO: change how the robot starts/ stops and runs
+    # ws_client = WebsocketClient(
+    #     set_pid_constants=robot._set_pid_constants,
+    #     get_pid_constants=robot._get_pid_constants,
+    #     start_robot=robot.start,
+    #     stop_robot=robot.shutdown
+    # )
+    # ws_client.connect()
 
 
     timer = time() + TIMER

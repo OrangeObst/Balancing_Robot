@@ -68,9 +68,9 @@ class BalancingRobot:
 
     # TODO: There might be an issue with the constants callback due to race conditions or timing issues.
     def _set_pid_constants(self, constants):
+        self.angle_pid.set_parameters(constants['ap'], constants['ai'], constants['ad'])
         if USE_POS_PID:
             self.pos_pid.set_parameters(constants['pp'], constants['pi'], constants['pd'])
-        self.angle_pid.set_parameters(constants['ap'], constants['ai'], constants['ad'])
 
     def _get_pid_constants(self):
         return {
