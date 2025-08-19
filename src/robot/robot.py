@@ -68,9 +68,10 @@ class BalancingRobot:
 
     # TODO: There might be an issue with the constants callback due to race conditions or timing issues.
     def _set_pid_constants(self, constants):
-        self.angle_pid.set_parameters(constants['ap'], constants['ai'], constants['ad'])
-        if USE_POS_PID:
-            self.pos_pid.set_parameters(constants['pp'], constants['pi'], constants['pd'])
+        print("setting pid constants")
+        # self.angle_pid.set_parameters(constants['ap'], constants['ai'], constants['ad'])
+        # if USE_POS_PID:
+        #     self.pos_pid.set_parameters(constants['pp'], constants['pi'], constants['pd'])
 
     def _get_pid_constants(self):
         return {
@@ -81,13 +82,22 @@ class BalancingRobot:
             'pi': self.pos_pid.ki if USE_POS_PID else None,
             'pd': self.pos_pid.kd if USE_POS_PID else None,
         }
+    
+    def _start(self):
+        pass
+
+    def _stop(self):
+        pass
 
     def _setup_comm(self):
-        self.udp_client = UdpClient(BROKER, PORT)
-        self.server = WebsocketClient(
-            constants_callback=self._set_pid_constants, 
-            constants_provider=self._get_pid_constants)
-        self.server.start()
+        # self.udp_client = UdpClient(BROKER, PORT)
+        self.client = WebsocketClient(
+            set_pid_constants=self._set_pid_constants,
+            get_pid_constants=self._get_pid_constants,
+            start_robot=self._start,
+            stop_robot=self._stop
+        )
+        self.client.connect()
 
     def _setup_startup_state(self):
         self.startup_angle_stable = False
@@ -110,7 +120,7 @@ class BalancingRobot:
             speed = self._run_control_logic(angle, dt)
             self._apply_motor_speed(speed)
             self._update_average_speed(speed)
-        self.data_collector.emit(self.server.emit_data)
+        self.client.emit('data', self.data_collector.get_latest())
         self.data_collector.snapshot()
         self.counter += 1
 

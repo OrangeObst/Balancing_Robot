@@ -15,6 +15,10 @@ def index():
 def handle_pid_constants_from_robot(payload):
     socketio.emit('pid_constants', payload, namespace='/client')
 
+@socketio.on('data', namespace='/robot')
+def handle_pid_constants_from_robot(payload):
+    socketio.emit('data', payload, namespace='/client')
+
 
 # ===== From Client to Robot ===== 
 

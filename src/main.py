@@ -20,9 +20,6 @@ config.read(config_file_path)
 # Position PID constants
 USE_POS_PID = config.getboolean('Position_PID', 'USE_POS_PID')                      # De-/activate position PID controller
 
-# Speed PID constants
-USE_SPEED_PID = config.getboolean('Speed_PID', 'USE_SPEED_PID')
-
 # Time settings
 DELAY = config.getfloat('Time', 'DELAY')                                            # Updatetime delay
 TIMER = config.getfloat('Time', 'TIMER')                                            # Runtime in seconds
@@ -94,16 +91,6 @@ if __name__ == "__main__":
         pos_pid = pos_pid,
         data_collector = data_collector
     )
-
-    # TODO: change how the robot starts/ stops and runs
-    # ws_client = WebsocketClient(
-    #     set_pid_constants=robot._set_pid_constants,
-    #     get_pid_constants=robot._get_pid_constants,
-    #     start_robot=robot.start,
-    #     stop_robot=robot.shutdown
-    # )
-    # ws_client.connect()
-
 
     timer = time() + TIMER
     try:

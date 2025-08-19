@@ -298,7 +298,6 @@
 
         socket.on('data', function (dataWrapper) {
             const data = dataWrapper.data || dataWrapper;
-
             angleChart.data.labels.push('');
 
             angleChart.data.datasets.forEach(dataset => {
@@ -350,6 +349,7 @@
             ['ap', 'ai', 'ad', 'pp', 'pi', 'pd'].forEach(key => {
                 constants[key] = parseFloat(document.getElementById("slider_" + key).value) || 0;
             });
+            console.log(constants)
             socket.emit('update_constants', constants);
         });
 
