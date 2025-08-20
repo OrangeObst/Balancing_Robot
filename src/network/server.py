@@ -32,11 +32,11 @@ def handle_update_constants(payload):
 
 @socketio.on('start_robot', namespace='/client')
 def handle_start_robot():
-    socketio.emit('start_robot', {}, namespace='/robot')
+    socketio.emit('start_robot', namespace='/robot')
 
 @socketio.on('stop_robot', namespace='/client')
 def handle_stop_robot():
-    socketio.emit('stop_robot', {}, namespace='/robot')
+    socketio.emit('stop_robot', namespace='/robot')
 
 if __name__ == '__main__':
-    socketio.run(app)
+    socketio.run(app, host='0.0.0.0')

@@ -5,10 +5,10 @@ from util.plot_graphs import Plotter
 from robot.MPU.MyMpu6050 import MyMPU6050
 from robot.pid_controller import PidController
 from robot.stepper_motor import Stepper
-from time import time
 from smbus2 import SMBus
 from configparser import ConfigParser
 import os
+import time
 
 
 config = ConfigParser()
@@ -92,17 +92,16 @@ if __name__ == "__main__":
         data_collector = data_collector
     )
 
-    timer = time() + TIMER
+    timer = time.time() + TIMER
     try:
-        while time() < timer:
-            robot.loop()
+        while time.time() < timer:
+            time.sleep(1)
+            # robot.loop()
     except KeyboardInterrupt:
         print("Interrupted")
     finally:
-        robot.shutdown()
-        
         print("Exiting ...")
-        print(f'Counter: {robot.counter}')
+        robot.shutdown()
 
 
     if LOG_DATA:

@@ -37,17 +37,16 @@ class BalancingRobot:
         self.pos_pid = pos_pid
 
         self.data_collector = data_collector
-        self.data_to_collect = {}
 
+        self.running = False
         self.previous_angle = 0.0
-        self.speed = 0.0
         self.average_speed = 0.0
         self.counter = 0
 
-        self._setup_filters()
-        self._setup_motors()
         self._setup_comm()
-        self._setup_startup_state()
+        # self._setup_filters()
+        # self._setup_motors()
+        # self._setup_startup_state()
 
         self.control_loop_task = TimedTask(delay=DELAY, run=self._control_loop)
 
@@ -61,17 +60,14 @@ class BalancingRobot:
         if USE_MOTORS:
             self.left_motor.start()
             self.right_motor.start()
-
-        if USE_PROCESSED_MOTORS:
+        elif USE_PROCESSED_MOTORS:
             self.process_motors = MultiprocessingStepper(self.left_motor, self.right_motor)
             self.process_motors.start()
 
-    # TODO: There might be an issue with the constants callback due to race conditions or timing issues.
     def _set_pid_constants(self, constants):
-        print("setting pid constants")
-        # self.angle_pid.set_parameters(constants['ap'], constants['ai'], constants['ad'])
-        # if USE_POS_PID:
-        #     self.pos_pid.set_parameters(constants['pp'], constants['pi'], constants['pd'])
+        self.angle_pid.set_parameters(constants['ap'], constants['ai'], constants['ad'])
+        if USE_POS_PID:
+            self.pos_pid.set_parameters(constants['pp'], constants['pi'], constants['pd'])
 
     def _get_pid_constants(self):
         return {
@@ -83,35 +79,53 @@ class BalancingRobot:
             'pd': self.pos_pid.kd if USE_POS_PID else None,
         }
     
-    def _start(self):
-        pass
+    def start(self):
+        if not self.running:
+            self._setup_filters()
+            self._setup_motors()
+            self._setup_startup_state()
+            self.running = True
+            self.loop()
 
-    def _stop(self):
-        pass
+    def stop(self):
+        self.running = False
+        self._stop_motors()
+        print(f'Counter: {self.counter}')
+        self._setup_startup_state()
+
+    def _stop_motors(self):
+        self.left_motor.stop()
+        self.left_motor.reset_motor()
+        self.left_motor.stop()
+        self.left_motor.reset_motor()
 
     def _setup_comm(self):
         # self.udp_client = UdpClient(BROKER, PORT)
         self.client = WebsocketClient(
             set_pid_constants=self._set_pid_constants,
             get_pid_constants=self._get_pid_constants,
-            start_robot=self._start,
-            stop_robot=self._stop
+            start_robot=self.start,
+            stop_robot=self.stop
         )
         self.client.connect()
 
     def _setup_startup_state(self):
+        self.previous_angle = 0.0
+        self.average_speed = 0.0
+        self.counter = 0
         self.startup_angle_stable = False
         self.within_angle_count = 0
         self.stable_angle_threshold = 1
-        self.stable_angle_duration = 0.3
+        self.stable_angle_duration = 0.5
         self.last_angle_stable_time = 0.0
         self.starting_time = time()
 
     def loop(self):
-        self.control_loop_task.loop()
-        if USE_MOTORS and not USE_PROCESSED_MOTORS:
-            self.left_motor.loop()
-            self.right_motor.loop()
+        while self.running:
+            self.control_loop_task.loop()
+            if USE_MOTORS and not USE_PROCESSED_MOTORS:
+                self.left_motor.loop()
+                self.right_motor.loop()
 
     def _control_loop(self, now, dt):
         data = self.mpu.get_all_data()

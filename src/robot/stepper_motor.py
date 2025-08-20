@@ -71,6 +71,12 @@ class Stepper:
     
     def get_microsteps(self):
         return self.microsteps
+    
+    def reset_motor(self):
+        self.steps = 0
+        self.dx = 1
+        self.step_delay = 1
+        self.last_step_ts = 0.0
 
     def loop(self):
         now = time.time()

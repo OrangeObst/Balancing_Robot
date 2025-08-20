@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>MPU6050 Visualization</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/socket.io-client/dist/socket.io.js"></script>
     <style>
@@ -349,7 +350,6 @@
             ['ap', 'ai', 'ad', 'pp', 'pi', 'pd'].forEach(key => {
                 constants[key] = parseFloat(document.getElementById("slider_" + key).value) || 0;
             });
-            console.log(constants)
             socket.emit('update_constants', constants);
         });
 

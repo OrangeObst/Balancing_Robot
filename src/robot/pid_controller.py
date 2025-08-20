@@ -158,6 +158,11 @@ class PidController(object):
     def set_setpoint(self, setpoint):
         self.setpoint = setpoint
 
+    def reset_controller(self):
+        self.previous_input = 0.0
+        self.previous_dterm = 0.0
+        self.sum_error = 0.0
+
 
 if __name__ == "__main__":
     pid = PidController(10, 0.4, 0.2, -100, 100, 0.0, 0.5)

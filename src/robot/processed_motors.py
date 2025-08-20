@@ -58,6 +58,12 @@ class MultiprocessingStepper():
         self.left_motor.shutdown()
         self.right_motor.shutdown()
 
+    def reset_motors(self):
+        self.left_motor.stop()
+        self.right_motor.stop()
+        self.left_motor.reset_motor()
+        self.right_motor.reset_motor()
+
 if __name__ == "__main__":
     from stepper_motor import Stepper
 
