@@ -91,7 +91,6 @@ class BalancingRobot:
         self.running = False
         self._stop_motors()
         print(f'Counter: {self.counter}')
-        self._setup_startup_state()
 
     def _stop_motors(self):
         self.left_motor.stop()
