@@ -81,18 +81,19 @@ class MyMPU6050:
 
     def get_raw_data(self) -> tuple[float, float, float, float, float, float]:
         data = self._read_sensor_data(_MPU6050_ACCEL_OUT_X, 14)
+        print(data)
         raw_accel = self._extract_raw_data(data, 0)
         raw_gyro = self._extract_raw_data(data, 8)
         return raw_accel + raw_gyro
 
     def get_all_data(self) -> tuple[float, float, float, float, float, float]:
         raw_ax, raw_ay, raw_az, raw_gx, raw_gy, raw_gz = self.get_raw_data()
-        ax = (raw_ax / self.ACCEL_SCALE) - self.AX_OFFSET
-        ay = (raw_ay / self.ACCEL_SCALE) - self.AY_OFFSET
-        az = (raw_az / self.ACCEL_SCALE) - self.AZ_OFFSET
-        gx = (raw_gx / self.GYRO_SCALE) - self.GX_OFFSET
-        gy = (raw_gy / self.GYRO_SCALE) - self.GY_OFFSET
-        gz = (raw_gz / self.GYRO_SCALE) - self.GZ_OFFSET
+        ax = (raw_ax - self.AX_OFFSET) / self.ACCEL_SCALE
+        ay = (raw_ay - self.AY_OFFSET) / self.ACCEL_SCALE
+        az = (raw_az - self.AZ_OFFSET) / self.ACCEL_SCALE
+        gx = (raw_gx - self.GX_OFFSET) / self.GYRO_SCALE
+        gy = (raw_gy - self.GY_OFFSET) / self.GYRO_SCALE
+        gz = (raw_gz - self.GZ_OFFSET) / self.GYRO_SCALE
         return ax, ay, az, gx, gy, gz
 
     def set_register(self, address, value):
@@ -108,8 +109,8 @@ class MyMPU6050:
 
     def calibrate_sensor(self, duration=3) -> tuple[float, float, float, float, float, float]:
         print("Calibrating sensor, do not move the system")
-        self.reset_mpu()
-        self.set_register(_MPU6050_PWR_MGMT_1, 0x01)
+        # self.reset_mpu()
+        # self.set_register(_MPU6050_PWR_MGMT_1, 0x01)
         
         self.AX_OFFSET = 0.0
         self.AY_OFFSET = 0.0
@@ -148,19 +149,11 @@ class MyMPU6050:
             self.AZ_OFFSET -= self.ACCEL_SCALE
         else:
             self.AZ_OFFSET += self.ACCEL_SCALE
-
-        self.AX_OFFSET /= self.ACCEL_SCALE
-        self.AY_OFFSET /= self.ACCEL_SCALE
-        self.AZ_OFFSET /= self.ACCEL_SCALE
-        self.GX_OFFSET /= self.GYRO_SCALE
-        self.GY_OFFSET /= self.GYRO_SCALE
-        self.GZ_OFFSET /= self.GYRO_SCALE
         
         print("Setting offsets to: ")
-        print(f'OFFSET AX, AY, AZ {self.AX_OFFSET:.6f}, {self.AY_OFFSET:.6f}, {self.AZ_OFFSET:.6f}')
-        print(f'OFFSET GX, GY, GZ {self.GX_OFFSET:.6f}, {self.GY_OFFSET:.6f}, {self.GZ_OFFSET:.6f}')
+        print(f'OFFSET AX: {self.AX_OFFSET:.6f}, AY: {self.AY_OFFSET:.6f}, AZ: {self.AZ_OFFSET:.6f}')
+        print(f'OFFSET GX: {self.GX_OFFSET:.6f}, GY: {self.GY_OFFSET:.6f}, GZ: {self.GZ_OFFSET:.6f}')
         return self.AX_OFFSET, self.AY_OFFSET, self.AZ_OFFSET, self.GX_OFFSET, self.GY_OFFSET, self.GZ_OFFSET
-
 
     def set_smplrt_div(self, bit_mask: int = 0x00):
         if bit_mask < 0 or bit_mask > 255:
@@ -183,7 +176,7 @@ class MyMPU6050:
             4     |      21              8.5     |          20           8.3       1
             5     |      10             13.8     |          10           13.4      1
             6     |      5               19.0    |           5           18.6      1
-            7     |          RESERVED            |           RESERVED              8
+            7     |          RESERVED            |              RESERVED           8
         '''
         if bit_mask > 0x6:
             raise ValueError("DLPF_CFG value must be between 0x0 and 0x6")

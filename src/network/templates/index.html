@@ -134,6 +134,7 @@
                     <button type="button" id="stopRobotButton" class="updateButton">Stop Robot</button>
                     <button type="button" id="calibrateMpuButton" class="updateButton">Calibrate MPU</button>
                     <button type="button" id="shutdownRobotButton" class="updateButton">Shutdown Robot</button>
+                    <button type="button" id="clearGraphButton" class="updateButton">Clear Graph</button>
                 </div>
             </form>
         </div>
@@ -172,7 +173,10 @@
                 maintainAspectRatio: false,
                 animation: false,
                 scales: {
-                    y: { beginAtZero: false },
+                    y: {
+                        suggestedMin: -20,
+                        suggestedMax: 20,
+                    },
                     x: { display: false }
                 },
                 plugins: {
@@ -371,6 +375,13 @@
                 constants[key] = parseFloat(document.getElementById("slider_" + key).value) || 0;
             });
             socket.emit('update_constants', constants);
+        });
+
+        document.getElementById('clearGraphButton').addEventListener('click', function () {
+            angleChart.data.datasets.forEach(dataset => {
+                dataset.data = [];
+            });
+            angleChart.update();
         });
 
         document.getElementById('updateChartButton').addEventListener('click', updateChart);
