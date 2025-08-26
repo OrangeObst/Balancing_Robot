@@ -106,7 +106,7 @@ class MyMPU6050:
         value = self.bus.read_byte_data(self.address, address)
         return value
 
-    def calibrate_sensor(self, duration=5) -> tuple[float, float, float, float, float, float]:
+    def calibrate_sensor(self, duration=3) -> tuple[float, float, float, float, float, float]:
         print("Calibrating sensor, do not move the system")
         self.reset_mpu()
         self.set_register(_MPU6050_PWR_MGMT_1, 0x01)

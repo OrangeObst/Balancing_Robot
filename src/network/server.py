@@ -30,6 +30,10 @@ def handle_client_connect():
 def handle_update_constants(payload):
     socketio.emit('update_constants', payload, namespace='/robot')
 
+@socketio.on('calibrate_mpu', namespace='/client')
+def handle_calibrate_mpu(payload=3):
+    socketio.emit('calibrate_mpu', payload, namespace='/robot')
+
 @socketio.on('start_robot', namespace='/client')
 def handle_start_robot():
     socketio.emit('start_robot', namespace='/robot')

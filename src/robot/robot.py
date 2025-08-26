@@ -31,6 +31,8 @@ class BalancingRobot:
     def __init__(self, left_motor, right_motor, mpu, angle_pid, pos_pid, data_collector, stop_event=None):
         self.left_motor = left_motor
         self.right_motor = right_motor
+        if USE_PROCESSED_MOTORS:
+            self.process_motors = MultiprocessingStepper(self.left_motor, self.right_motor)
         self.mpu = mpu
 
         self.angle_pid = angle_pid
@@ -46,9 +48,6 @@ class BalancingRobot:
         self.counter = 0
 
         self._setup_comm()
-        # self._setup_filters()
-        # self._setup_motors()
-        # self._setup_startup_state()
 
         self.control_loop_task = TimedTask(delay=DELAY, run=self._control_loop)
 
@@ -63,15 +62,14 @@ class BalancingRobot:
             self.left_motor.start()
             self.right_motor.start()
         elif USE_PROCESSED_MOTORS:
-            self.process_motors = MultiprocessingStepper(self.left_motor, self.right_motor)
             self.process_motors.start()
 
-    def _set_pid_constants(self, constants):
+    def set_pid_constants(self, constants):
         self.angle_pid.set_parameters(constants['ap'], constants['ai'], constants['ad'])
         if USE_POS_PID:
             self.pos_pid.set_parameters(constants['pp'], constants['pi'], constants['pd'])
 
-    def _get_pid_constants(self):
+    def get_pid_constants(self):
         return {
             'ap': self.angle_pid.kp,
             'ai': self.angle_pid.ki,
@@ -80,6 +78,9 @@ class BalancingRobot:
             'pi': self.pos_pid.ki if USE_POS_PID else None,
             'pd': self.pos_pid.kd if USE_POS_PID else None,
         }
+    
+    def calibrate_mpu(self, duration=3):
+        self.mpu.calibrate_sensor(duration)
     
     def start(self):
         if not self.running:
@@ -103,8 +104,9 @@ class BalancingRobot:
     def _setup_comm(self):
         # self.udp_client = UdpClient(BROKER, PORT)
         self.client = WebsocketClient(
-            set_pid_constants=self._set_pid_constants,
-            get_pid_constants=self._get_pid_constants,
+            set_pid_constants=self.set_pid_constants,
+            get_pid_constants=self.get_pid_constants,
+            calibrate_mpu=self.calibrate_mpu,
             start_robot=self.start,
             stop_robot=self.stop,
             shutdown_robot=self.shutdown

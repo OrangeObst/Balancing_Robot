@@ -1,7 +1,7 @@
 import socketio
 
 class WebsocketClient:
-    def __init__(self, set_pid_constants, get_pid_constants, start_robot, stop_robot, shutdown_robot, server_url='http://127.0.0.1:5000'):
+    def __init__(self, set_pid_constants, get_pid_constants, calibrate_mpu, start_robot, stop_robot, shutdown_robot, server_url='http://127.0.0.1:5000'):
         self.sio = socketio.Client()
         self.server_url = server_url
 
@@ -17,6 +17,10 @@ class WebsocketClient:
         def on_get_constants():
             constants = get_pid_constants()
             self.sio.emit('pid_constants', constants, namespace='/robot')
+
+        @self.sio.on('calibrate_mpu', namespace='/robot')
+        def on_calibrate_mpu(duration=3):
+            calibrate_mpu(duration)
 
         @self.sio.on('start_robot', namespace='/robot')
         def on_start_robot():

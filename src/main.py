@@ -110,14 +110,3 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, _shutdown)
 
     stop_event.wait()
-
-    # timer = time.time() + TIMER
-    # try:
-    #     while time.time() < timer:
-    #         time.sleep(1)
-    #         # robot.loop()
-    # except KeyboardInterrupt:
-    #     print("Interrupted")
-    # finally:
-    #     print("Exiting ...")
-    #     robot.shutdown()

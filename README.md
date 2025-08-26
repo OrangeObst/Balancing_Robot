@@ -41,7 +41,7 @@ This project showcases a self-balancing robot designed to demonstrate stability 
    - Stand the robot upright at the angle at which it is in equilibrium
    - Run the MPU's calibration function (calibrate_sensor(t), t in seconds)
    - The MPU class has a function to set the digital lowpass filter and samplerate divisor according to the chosen time delay between measurements. (optimize_sample_settings(t), t in ms)
-   - Adjust the PID values, which are at the top of the main.py file, to your liking. Higher values will result in more aggressive balancing attempts. Lower values will result in more subtle balancing attempts.
+   - Adjust the PID values, which are in the [settings](/src/settings.ini), to your liking. Higher values will result in more aggressive balancing attempts but may overshoot. Lower values will result in more subtle balancing attempts but may not be able to react in time.
 
 
 -------------------------------------
@@ -58,8 +58,6 @@ This project showcases a self-balancing robot designed to demonstrate stability 
     - Motor step count
 
 * **Web Interface**
-
-    - The server starts as soon as the main.py is run.
     - Open a browser and navigate to `http://<robot-ip>:5000/`.
     - Use the web interface to:
         - Monitor live data and graphs.
