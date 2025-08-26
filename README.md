@@ -82,7 +82,7 @@ This project showcases a self-balancing robot designed to demonstrate stability 
 ## Understanding the controlls 
 
 * **Planned behaviour**: The controlls are designed around the following design: 
-    Positive angle -> positive speed -> positive steps
+    Positive angle -> positive speed -> positive steps -> negative target angle
     
     | Controller   | Input               | Setpoint               | Output               |
     | ------------ | ------------------- | ---------------------- | -------------------- |
