@@ -132,6 +132,7 @@
                     <button type="button" id="sendConstantsButton" class="updateButton">Send Constants</button>
                     <button type="button" id="startRobotButton" class="updateButton">Start Robot</button>
                     <button type="button" id="stopRobotButton" class="updateButton">Stop Robot</button>
+                    <button type="button" id="shutdownRobotButton" class="updateButton">Shutdown Robot</button>
                 </div>
             </form>
         </div>
@@ -352,6 +353,9 @@
         });
         document.getElementById('stopRobotButton').addEventListener('click', function () {
             socket.emit('stop_robot');
+        });
+        document.getElementById('shutdownRobotButton').addEventListener('click', function () {
+            socket.emit('shutdown_robot');
         });
 
         document.getElementById('sendConstantsButton').addEventListener('click', function () {

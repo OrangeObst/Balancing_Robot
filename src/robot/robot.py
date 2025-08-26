@@ -28,7 +28,7 @@ PORT = config.getint('Communication', 'PORT')
 
 
 class BalancingRobot:
-    def __init__(self, left_motor, right_motor, mpu, angle_pid, pos_pid, data_collector):
+    def __init__(self, left_motor, right_motor, mpu, angle_pid, pos_pid, data_collector, stop_event=None):
         self.left_motor = left_motor
         self.right_motor = right_motor
         self.mpu = mpu
@@ -37,6 +37,8 @@ class BalancingRobot:
         self.pos_pid = pos_pid
 
         self.data_collector = data_collector
+
+        self._stop_event = stop_event
 
         self.running = False
         self.previous_angle = 0.0
@@ -104,7 +106,8 @@ class BalancingRobot:
             set_pid_constants=self._set_pid_constants,
             get_pid_constants=self._get_pid_constants,
             start_robot=self.start,
-            stop_robot=self.stop
+            stop_robot=self.stop,
+            shutdown_robot=self.shutdown
         )
         self.client.connect()
 
@@ -218,3 +221,8 @@ class BalancingRobot:
         else:
             self.left_motor.shutdown()
             self.right_motor.shutdown()
+        try:
+            if self._stop_event is not None:
+                self._stop_event.set()
+        except Exception:
+            pass

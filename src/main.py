@@ -1,12 +1,13 @@
-from network.websocket import WebsocketClient
+
 from robot.robot import BalancingRobot
 from util.data_collector import DataCollector
-from util.plot_graphs import Plotter
 from robot.MPU.MyMpu6050 import MyMPU6050
 from robot.pid_controller import PidController
 from robot.stepper_motor import Stepper
 from smbus2 import SMBus
 from configparser import ConfigParser
+from threading import Event
+import signal
 import os
 import time
 
@@ -82,6 +83,8 @@ if __name__ == "__main__":
     # ----- Logging -----
     data_collector = DataCollector()
     
+    stop_event = Event()
+
     # ----- Robot -----
     robot = BalancingRobot(
         left_motor = left_motor,
@@ -89,44 +92,32 @@ if __name__ == "__main__":
         mpu = mpu,
         angle_pid = angle_pid,
         pos_pid = pos_pid,
-        data_collector = data_collector
+        data_collector = data_collector,
+        stop_event=stop_event
     )
 
-    timer = time.time() + TIMER
-    try:
-        while time.time() < timer:
-            time.sleep(1)
-            # robot.loop()
-    except KeyboardInterrupt:
-        print("Interrupted")
-    finally:
-        print("Exiting ...")
-        robot.shutdown()
+    def _shutdown(signum, frame):
+        print('Signal received, shutting down')
+        try:
+            if robot.running:
+                robot.stop()
+            robot.shutdown()
+        except Exception as e:
+            print('Error during robot shutdown', e)
+        stop_event.set()
 
+    signal.signal(signal.SIGINT, _shutdown)
+    signal.signal(signal.SIGTERM, _shutdown)
 
-    if LOG_DATA:
-        angle_pid_const = [
-            ap,
-            ai,
-            ad
-        ]
-        pos_pid_const = [
-            pp,
-            pi,
-            pd
-        ]
+    stop_event.wait()
 
-        collected_data = data_collector.get_all()
-
-        plotter = Plotter(angle_pid_const, pos_pid_const)
-        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle'], 'Target angle': collected_data['pos_pid_terms']['output']}, 'Steps', {'Steps': collected_data['avg_steps']}, TIMER, name='Angles_to_steps')
-        plotter.plot_measurements('Angles [°]', {'Robot angle': collected_data['angle']}, 'Speed', {'Speed': collected_data['angle_pid_terms']['output']}, TIMER, name='Angle_to_Speed')        
-        plotter.plot_measurements('Angles [°]', {'Accel angle': collected_data['accel_angle'], 'Gyro angle': collected_data['gyro_angle']}, TIMER, name='Accel_Gyro_angles')
-        plotter.plot_measurements('Accel', {'ax': collected_data['ax'], 'ay': collected_data['ay'], 'az': collected_data['az']}, TIMER, name="Accel_Data")
-        plotter.plot_measurements('Gyro', {'gx': collected_data['gx'], 'gy': collected_data['gy'], 'gz': collected_data['gz']}, TIMER, name="Gyro_Data")
-        plotter.plot_measurements('PD values', {'P terms': collected_data['angle_pid_terms']['p_terms'], 'D terms': collected_data['angle_pid_terms']['d_terms'], 'Output': collected_data['angle_pid_terms']['output']}, TIMER, name='PD graph')
-        plotter.subplot_p_i_d_values('Angle', collected_data['angle_pid_terms'], TIMER, 100, unified_y_limit=False, name='Angle_PID_Terms')
-        if USE_POS_PID:
-            plotter.subplot_p_i_d_values('Position', collected_data['pos_pid_terms'], TIMER, 100, unified_y_limit=False, name='Position_PID_Terms')
-        
-        plotter.plot_angles([[collected_data['angle'],'Robot angle'], [collected_data['pos_pid_terms']['output'],'Target angle']], TIMER,  name='Angle_to_target_angle')
+    # timer = time.time() + TIMER
+    # try:
+    #     while time.time() < timer:
+    #         time.sleep(1)
+    #         # robot.loop()
+    # except KeyboardInterrupt:
+    #     print("Interrupted")
+    # finally:
+    #     print("Exiting ...")
+    #     robot.shutdown()

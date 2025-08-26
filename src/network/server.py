@@ -38,5 +38,9 @@ def handle_start_robot():
 def handle_stop_robot():
     socketio.emit('stop_robot', namespace='/robot')
 
+@socketio.on('shutdown_robot', namespace='/client')
+def handle_shutdown_robot():
+    socketio.emit('shutdown_robot', namespace='/robot')
+
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0')
