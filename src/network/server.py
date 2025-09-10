@@ -11,14 +11,17 @@ def index():
 
 # ===== From Robot to Client ===== 
 
+@socketio.on('data', namespace='/robot')
+def handle_data(payload):
+    socketio.emit('data', payload, namespace='/client')
+
 @socketio.on('pid_constants', namespace='/robot')
 def handle_pid_constants_from_robot(payload):
     socketio.emit('pid_constants', payload, namespace='/client')
 
-@socketio.on('data', namespace='/robot')
-def handle_pid_constants_from_robot(payload):
-    socketio.emit('data', payload, namespace='/client')
-
+@socketio.on('pos_Pid_status', namespace='/robot')
+def handle_pos_Pid_status(payload):
+    socketio.emit('pos_Pid_status', payload, namespace='/client')
 
 # ===== From Client to Robot ===== 
 
@@ -45,6 +48,14 @@ def handle_stop_robot():
 @socketio.on('shutdown_robot', namespace='/client')
 def handle_shutdown_robot():
     socketio.emit('shutdown_robot', namespace='/robot')
+
+@socketio.on('save_settings', namespace='/client')
+def handle_save_settings():
+    socketio.emit('save_settings', namespace='/robot')
+
+@socketio.on('switch_PosPid', namespace='/client')
+def handle_switch_PosPid():
+    socketio.emit('switch_PosPid', namespace='/robot')
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0')

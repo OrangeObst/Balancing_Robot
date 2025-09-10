@@ -16,14 +16,13 @@
 
         #topContainer {
             display: flex;
-            gap: 30px;
+            gap: 10px;
             max-width: 1600px;
             margin-bottom: 5px;
             font-size: small;
         }
 
         #leftSide {
-            flex: 1;
             min-width: 300px;
         }
 
@@ -47,7 +46,7 @@
 
         #checkboxContainer {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 5px;
             width: 100%;
         }
@@ -114,34 +113,41 @@
 
 <body>
     <div id="topContainer">
-        <div id="leftSide">
-            <h3>Trackable values</h3>
-            <div id="checkboxContainer"></div>
-            <div class="updateButtonAlignment"><button type="button" id="updateChartButton" class="updateButton">Update
-                    Chart</button></div>
+        <div class="updateButtonAlignment">
+            <button type="button" id="startRobotButton" class="updateButton">Start Robot</button>
+            <button type="button" id="stopRobotButton" class="updateButton">Stop Robot</button>
+            <button type="button" id="calibrateMpuButton" class="updateButton">Calibrate MPU</button>
+            <button type="button" id="shutdownRobotButton" class="updateButton">Shutdown Robot</button>
+            <button type="button" id="saveSettingsButton" class="updateButton">Save Settings</button>
         </div>
         <div class="vertical-divider"></div>
         <div id="rightSide">
             <h3>PID Constants</h3>
-            <form id="constantsForm">
+            <div id="constantsForm">
                 <div id="constantsFormContainer">
                     <div id="anglePIDGroup" class="pidGroup"></div>
                     <div id="positionPIDGroup" class="pidGroup"></div>
                 </div>
                 <div class="updateButtonAlignment">
                     <button type="button" id="sendConstantsButton" class="updateButton">Send Constants</button>
-                    <button type="button" id="startRobotButton" class="updateButton">Start Robot</button>
-                    <button type="button" id="stopRobotButton" class="updateButton">Stop Robot</button>
-                    <button type="button" id="calibrateMpuButton" class="updateButton">Calibrate MPU</button>
-                    <button type="button" id="shutdownRobotButton" class="updateButton">Shutdown Robot</button>
-                    <button type="button" id="clearGraphButton" class="updateButton">Clear Graph</button>
+                    <button type="button" id="switchPosPidButton" class="updateButton">Turn On/Off Pos PID</button>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
     <div class="divider"></div>
-    <div id="chartContainer">
-        <canvas id="angleChart"></canvas>
+    <div id="topContainer">
+        <div id="chartContainer">
+            <canvas id="angleChart"></canvas>
+        </div>
+        <div id="leftSide">
+            <h3>Trackable values</h3>
+            <div id="checkboxContainer"></div>
+            <div class="updateButtonAlignment">
+                <button type="button" id="updateChartButton" class="updateButton">Update Chart</button>
+                <button type="button" id="clearGraphButton" class="updateButton">Clear Graph</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -202,9 +208,9 @@
             });
 
             const positionKeys = [
-                { key: 'pp', label: 'Position P', min: 0.1, max: 15, step: 0.1 },
-                { key: 'pi', label: 'Position I', min: 0, max: 5, step: 0.01 },
-                { key: 'pd', label: 'Position D', min: 0, max: 0.3, step: 0.001 }
+                { key: 'pp', label: 'Position P', min: 0, max: 1, step: 0.0001 },
+                { key: 'pi', label: 'Position I', min: 0, max: 1, step: 0.0001 },
+                { key: 'pd', label: 'Position D', min: 0, max: 1, step: 0.00001 }
             ];
             const positionGroup = document.getElementById('positionPIDGroup');
             positionKeys.forEach(cfg => {
@@ -259,7 +265,7 @@
             s = d.getElementsByClassName("slider")[0];
             l = d.getElementsByClassName("valueLabel")[0];
             s.value = Number(s.value) + (dir * s.step);
-            l.innerHTML = Number(s.value).toFixed(3);
+            l.innerHTML = Number(s.value);
             var cmd = d.getAttribute('command');
         }
 
@@ -267,7 +273,7 @@
             s = d.getElementsByClassName("slider")[0];
             l = d.getElementsByClassName("valueLabel")[0];
             s.value = val;
-            l.innerHTML = Number(val).toFixed(3);
+            l.innerHTML = Number(val);
         }
 
         function parseValue(cmd, val) {
@@ -338,8 +344,9 @@
                 var label = document.getElementById("label_" + key);
                 if (slider && label) {
                     slider.value = constants[key];
-                    label.innerHTML = Number(constants[key]).toFixed(3);
+                    label.innerHTML = Number(constants[key]);
                 }
+                console.log(constants[key])
             });
         });
 
@@ -350,6 +357,15 @@
             } else {
                 document.getElementById('startRobotButton').disabled = false;
                 document.getElementById('stopRobotButton').disabled = true;
+            }
+        });
+
+        socket.on('pos_Pid_status', function (status) {
+            button = document.getElementById('switchPosPidButton')
+            if (status) {
+                button.innerHTML = 'Disable Pos PID'
+            } else {
+                button.innerHTML = 'Enable Pos PID'
             }
         });
 
@@ -367,6 +383,14 @@
 
         document.getElementById('calibrateMpuButton').addEventListener('click', function () {
             socket.emit('calibrate_mpu');
+        });
+
+        document.getElementById('saveSettingsButton').addEventListener('click', function () {
+            socket.emit('save_settings');
+        });
+        
+        document.getElementById('switchPosPidButton').addEventListener('click', function () {
+            socket.emit('switch_PosPid');
         });
 
         document.getElementById('sendConstantsButton').addEventListener('click', function () {

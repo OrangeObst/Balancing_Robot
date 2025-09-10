@@ -81,7 +81,6 @@ class MyMPU6050:
 
     def get_raw_data(self) -> tuple[float, float, float, float, float, float]:
         data = self._read_sensor_data(_MPU6050_ACCEL_OUT_X, 14)
-        print(data)
         raw_accel = self._extract_raw_data(data, 0)
         raw_gyro = self._extract_raw_data(data, 8)
         return raw_accel + raw_gyro
@@ -245,6 +244,9 @@ class MyMPU6050:
 
     def get_gyro_offset(self) -> tuple[float, float, float]:
         return self.GX_OFFSET, self.GY_OFFSET, self.GZ_OFFSET
+    
+    def get_all_offsets(self) -> tuple [float, float, float, float, float, float]:
+        return self.get_accel_offset() + self.get_gyro_offset()
     
     def enable_fifo_reg(self):
         bit_mask = self.read_register(_MPU6050_USER_CTRL)

@@ -37,6 +37,7 @@ class BalancingRobot:
 
         self.angle_pid = angle_pid
         self.pos_pid = pos_pid
+        self.use_pos_pid = USE_POS_PID
 
         self.data_collector = data_collector
 
@@ -66,22 +67,50 @@ class BalancingRobot:
 
     def set_pid_constants(self, constants):
         self.angle_pid.set_parameters(constants['ap'], constants['ai'], constants['ad'])
-        if USE_POS_PID:
+        if self.use_pos_pid:
             self.pos_pid.set_parameters(constants['pp'], constants['pi'], constants['pd'])
 
-    def get_pid_constants(self):
-        return {
+    def send_pid_constants(self):
+        constants = {
             'ap': self.angle_pid.kp,
             'ai': self.angle_pid.ki,
             'ad': self.angle_pid.kd,
-            'pp': self.pos_pid.kp if USE_POS_PID else None,
-            'pi': self.pos_pid.ki if USE_POS_PID else None,
-            'pd': self.pos_pid.kd if USE_POS_PID else None,
+            'pp': self.pos_pid.kp if self.use_pos_pid else None,
+            'pi': self.pos_pid.ki if self.use_pos_pid else None,
+            'pd': self.pos_pid.kd if self.use_pos_pid else None,
         }
+        self.client.emit('pid_constants', constants)
+
     
     def calibrate_mpu(self, duration=3):
         self.mpu.calibrate_sensor(duration)
-    
+
+    def save_settings(self):
+        global config
+        mpu_offsets = self.mpu.get_all_offsets()
+        pid_constants = self.get_pid_constants()
+        config['MPU']['AX_OFFSET'] = str(mpu_offsets[0])
+        config['MPU']['AY_OFFSET'] = str(mpu_offsets[1])
+        config['MPU']['AZ_OFFSET'] = str(mpu_offsets[2])
+        config['MPU']['GX_OFFSET'] = str(mpu_offsets[3])
+        config['MPU']['GY_OFFSET'] = str(mpu_offsets[4])
+        config['MPU']['GZ_OFFSET'] = str(mpu_offsets[5])
+        config['Angle_PID']['AP'] = str(pid_constants['ap'])
+        config['Angle_PID']['AI'] = str(pid_constants['ai'])
+        config['Angle_PID']['AD'] = str(pid_constants['ad'])
+        if self.use_pos_pid:
+            config['Position_PID']['PP'] = str(pid_constants['pp'])
+            config['Position_PID']['PI'] = str(pid_constants['pi'])
+            config['Position_PID']['PD'] = str(pid_constants['pd'])
+        with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'settings.ini'), 'w') as settingsfile:
+            config.write(settingsfile)
+
+    def switch_PosPid(self):
+        self.use_pos_pid = not self.use_pos_pid
+        self.client.emit('pos_Pid_status', self.use_pos_pid)
+        if self.use_pos_pid:
+            self.send_pid_constants()
+
     def start(self):
         if not self.running:
             self._setup_filters()
@@ -105,11 +134,13 @@ class BalancingRobot:
         # self.udp_client = UdpClient(BROKER, PORT)
         self.client = WebsocketClient(
             set_pid_constants=self.set_pid_constants,
-            get_pid_constants=self.get_pid_constants,
+            get_pid_constants=self.send_pid_constants,
             calibrate_mpu=self.calibrate_mpu,
             start_robot=self.start,
             stop_robot=self.stop,
-            shutdown_robot=self.shutdown
+            shutdown_robot=self.shutdown,
+            save_settings=self.save_settings,
+            switch_PosPid=self.switch_PosPid
         )
         self.client.connect()
 
@@ -191,7 +222,7 @@ class BalancingRobot:
         return (self.average_speed / 100) * 3000                            # avg_speed in steps per second
 
     def _get_target_angle(self, steps, dt):
-        if USE_POS_PID:
+        if self.use_pos_pid:
             self.pos_pid.set_setpoint(self.average_speed)
             output, p_pterm, p_iterm, p_dterm = self.pos_pid.update(-steps/1000, dt)
             target = self.lpf_target_angle.filter(output) if FILTER_TARGET_ANGLE else output   
