@@ -19,9 +19,9 @@ def handle_data(payload):
 def handle_pid_constants_from_robot(payload):
     socketio.emit('pid_constants', payload, namespace='/client')
 
-@socketio.on('pos_Pid_status', namespace='/robot')
-def handle_pos_Pid_status(payload):
-    socketio.emit('pos_Pid_status', payload, namespace='/client')
+@socketio.on('pos_pid_status', namespace='/robot')
+def handle_pos_pid_status(payload):
+    socketio.emit('pos_pid_status', payload, namespace='/client')
 
 # ===== From Client to Robot ===== 
 

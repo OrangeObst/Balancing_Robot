@@ -1,9 +1,10 @@
 
+from robot.motors.motor_controller import MotorController
 from robot.robot import BalancingRobot
 from util.data_collector import DataCollector
 from robot.MPU.MyMpu6050 import MyMPU6050
 from robot.pid_controller import PidController
-from robot.stepper_motor import Stepper
+from robot.motors.stepper_motor import Stepper
 from smbus2 import SMBus
 from configparser import ConfigParser
 from threading import Event
@@ -28,6 +29,7 @@ TIMER = config.getfloat('Time', 'TIMER')                                        
 # Motor settings
 USE_MOTORS = config.getboolean('Motor', 'USE_MOTORS')                               # De-/activate motors
 MICROSTEPS = config.getfloat('Motor', 'MICROSTEPS')                                 # Stepper motor HAT microstep setting
+USE_PROCESSED_MOTORS = config.getboolean('Motor', 'USE_PROCESSED_MOTORS')           # Use processed motors (MultiprocessingStepper)
 
 # MPU settings
 SAMPLE_TIME = config.getfloat('MPU', 'SAMPLE_TIME')                                 # MPUaverager sample time => DELAY / SAMPLE_TIME
@@ -41,19 +43,14 @@ if __name__ == "__main__":
     # ----- MPU -----
     bus = SMBus(1)
     mpu = MyMPU6050(bus)
-
-    if CALIBRATE:
-        mpu.calibrate_sensor(3)
-    else:
-        ax_offset = config.getfloat('MPU', 'AX_OFFSET')
-        ay_offset = config.getfloat('MPU', 'AY_OFFSET')
-        az_offset = config.getfloat('MPU', 'AZ_OFFSET')
-        gx_offset = config.getfloat('MPU', 'GX_OFFSET')
-        gy_offset = config.getfloat('MPU', 'GY_OFFSET')
-        gz_offset = config.getfloat('MPU', 'GZ_OFFSET')
-        mpu.set_accel_offset(ax_offset, ay_offset, az_offset)
-        mpu.set_gyro_offset(gx_offset, gy_offset, gz_offset)
-
+    ax_offset = config.getfloat('MPU', 'AX_OFFSET')
+    ay_offset = config.getfloat('MPU', 'AY_OFFSET')
+    az_offset = config.getfloat('MPU', 'AZ_OFFSET')
+    gx_offset = config.getfloat('MPU', 'GX_OFFSET')
+    gy_offset = config.getfloat('MPU', 'GY_OFFSET')
+    gz_offset = config.getfloat('MPU', 'GZ_OFFSET')
+    mpu.set_accel_offset(ax_offset, ay_offset, az_offset)
+    mpu.set_gyro_offset(gx_offset, gy_offset, gz_offset)
     sample_time = DELAY
     mpu.optimize_sample_settings(sample_time)
 
@@ -61,15 +58,15 @@ if __name__ == "__main__":
     min_velocity = -100
     max_velocity = 100
     angle_setpoint = 0.0
-    ap = config.getfloat('Angle_PID', 'AP')                 # 15
-    ai = config.getfloat('Angle_PID', 'AI')                 # 0.01
-    ad = config.getfloat('Angle_PID', 'AD')                 # 0.15
+    ap = config.getfloat('Angle_PID', 'AP')
+    ai = config.getfloat('Angle_PID', 'AI')
+    ad = config.getfloat('Angle_PID', 'AD')
     position_setpoint = 0.0
     min_angle = -25.0
     max_angle = 25.0
-    pp = config.getfloat('Position_PID', 'PP')              # 0.0005
-    pi = config.getfloat('Position_PID', 'PI')              # 0.0
-    pd = config.getfloat('Position_PID', 'PD')              # 0.0006
+    pp = config.getfloat('Position_PID', 'PP')
+    pi = config.getfloat('Position_PID', 'PI')
+    pd = config.getfloat('Position_PID', 'PD')
     delay = DELAY
 
     angle_pid = PidController(ap, ai, ad, min_velocity, max_velocity, setpoint=angle_setpoint, alpha=0.5, deadband=0.4)
@@ -79,7 +76,8 @@ if __name__ == "__main__":
     spr = 200 * MICROSTEPS
     left_motor = Stepper(dir_pin=13, step_pin=19, enable_pin=12, mode_pins=(16, 17, 20), microsteps=8)
     right_motor = Stepper(dir_pin=24, step_pin=18, enable_pin=4, mode_pins=(21, 22, 27), microsteps=8, invert_direction=True)
-
+    motor_controller = MotorController(left_motor, right_motor, processed=USE_PROCESSED_MOTORS)
+    
     # ----- Logging -----
     data_collector = DataCollector()
     
@@ -87,13 +85,12 @@ if __name__ == "__main__":
 
     # ----- Robot -----
     robot = BalancingRobot(
-        left_motor = left_motor,
-        right_motor = right_motor,
+        motor_controller = motor_controller,
         mpu = mpu,
         angle_pid = angle_pid,
         pos_pid = pos_pid,
         data_collector = data_collector,
-        stop_event=stop_event
+        stop_event = stop_event
     )
 
     def _shutdown(signum, frame):

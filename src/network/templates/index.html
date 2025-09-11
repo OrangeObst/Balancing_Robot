@@ -46,7 +46,7 @@
 
         #checkboxContainer {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 5px;
             width: 100%;
         }
@@ -99,7 +99,7 @@
 
         #chartContainer {
             position: relative;
-            width: 100%;
+            width: 80%;
             max-width: 1200px;
             height: 600px;
         }
@@ -351,7 +351,7 @@
         });
 
         socket.on('robot_status', function (status) {
-            if (status.running) {
+            if (status) {
                 document.getElementById('startRobotButton').disabled = true;
                 document.getElementById('stopRobotButton').disabled = false;
             } else {

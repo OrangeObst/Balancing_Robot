@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.robot.stepper_motor import Stepper
+from robot.motors.stepper_motor import Stepper
 import RPi.GPIO as GPIO
 import unittest
 

@@ -73,6 +73,7 @@ class Stepper:
         return self.microsteps
     
     def reset_motor(self):
+        GPIO.output(self.enable_pin, GPIO.LOW)
         self.steps = 0
         self.dx = 1
         self.step_delay = 1

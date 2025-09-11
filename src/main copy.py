@@ -5,7 +5,7 @@ from util import timed_task, plot_graphs
 from robot.MPU.MyMpu6050 import MyMPU6050
 from util.lowpassfilter import LowPassFilter
 from robot.pid_controller import PidController
-from robot.stepper_motor import Stepper
+from robot.motors.stepper_motor import Stepper
 from robot.MPU.MpuDataAverager import MpuDataAverager
 from time import time
 from smbus2 import SMBus

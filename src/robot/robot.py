@@ -6,7 +6,6 @@ from network.udp_client import UdpClient
 from network.websocket import WebsocketClient
 from util.timed_task import TimedTask
 from util.lowpassfilter import LowPassFilter
-from robot.processed_motors import MultiprocessingStepper
 
 # === Configuration Loading ===
 config = ConfigParser()
@@ -14,25 +13,18 @@ config.read(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 
 # === Config Constants ===
 USE_POS_PID = config.getboolean('Position_PID', 'USE_POS_PID')
-MAX_TARGET_ANGLE = config.getfloat('Position_PID', 'MAX_TARGET_ANGLE')
 FILTER_TARGET_ANGLE = config.getboolean('Position_PID', 'FILTER_TARGET_ANGLE')
 DELAY = config.getfloat('Time', 'DELAY')
 USE_MOTORS = config.getboolean('Motor', 'USE_MOTORS')
-USE_PROCESSED_MOTORS = config.getboolean('Motor', 'USE_PROCESSED_MOTORS')
-MICROSTEPS = config.getfloat('Motor', 'MICROSTEPS')
 COMPLEMENTARY_ALPHA = config.getfloat('MPU', 'COMPLEMENTARY_ALPHA')
 FILTER_ACCEL_ANGLE = config.getboolean('MPU', 'FILTER_ACCEL_ANGLE')
-LOG_DATA = config.getboolean('Logging', 'LOG_DATA')
 BROKER = config.get('Communication', 'BROKER')
 PORT = config.getint('Communication', 'PORT')
 
 
 class BalancingRobot:
-    def __init__(self, left_motor, right_motor, mpu, angle_pid, pos_pid, data_collector, stop_event=None):
-        self.left_motor = left_motor
-        self.right_motor = right_motor
-        if USE_PROCESSED_MOTORS:
-            self.process_motors = MultiprocessingStepper(self.left_motor, self.right_motor)
+    def __init__(self, motor_controller, mpu, angle_pid, pos_pid, data_collector, stop_event=None):
+        self.motor_controller = motor_controller
         self.mpu = mpu
 
         self.angle_pid = angle_pid
@@ -58,13 +50,6 @@ class BalancingRobot:
         self.lpf_target_angle = LowPassFilter(alpha)
         self.alpha = COMPLEMENTARY_ALPHA
 
-    def _setup_motors(self):
-        if USE_MOTORS:
-            self.left_motor.start()
-            self.right_motor.start()
-        elif USE_PROCESSED_MOTORS:
-            self.process_motors.start()
-
     def set_pid_constants(self, constants):
         self.angle_pid.set_parameters(constants['ap'], constants['ai'], constants['ad'])
         if self.use_pos_pid:
@@ -75,9 +60,9 @@ class BalancingRobot:
             'ap': self.angle_pid.kp,
             'ai': self.angle_pid.ki,
             'ad': self.angle_pid.kd,
-            'pp': self.pos_pid.kp if self.use_pos_pid else None,
-            'pi': self.pos_pid.ki if self.use_pos_pid else None,
-            'pd': self.pos_pid.kd if self.use_pos_pid else None,
+            'pp': self.pos_pid.kp if self.use_pos_pid else 0.0,
+            'pi': self.pos_pid.ki if self.use_pos_pid else 0.0,
+            'pd': self.pos_pid.kd if self.use_pos_pid else 0.0,
         }
         self.client.emit('pid_constants', constants)
 
@@ -98,37 +83,32 @@ class BalancingRobot:
         config['Angle_PID']['AP'] = str(pid_constants['ap'])
         config['Angle_PID']['AI'] = str(pid_constants['ai'])
         config['Angle_PID']['AD'] = str(pid_constants['ad'])
-        if self.use_pos_pid:
-            config['Position_PID']['PP'] = str(pid_constants['pp'])
-            config['Position_PID']['PI'] = str(pid_constants['pi'])
-            config['Position_PID']['PD'] = str(pid_constants['pd'])
+        config['Position_PID']['PP'] = str(pid_constants['pp'])
+        config['Position_PID']['PI'] = str(pid_constants['pi'])
+        config['Position_PID']['PD'] = str(pid_constants['pd'])
         with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'settings.ini'), 'w') as settingsfile:
             config.write(settingsfile)
 
-    def switch_PosPid(self):
+    def switch_pos_pid(self):
         self.use_pos_pid = not self.use_pos_pid
-        self.client.emit('pos_Pid_status', self.use_pos_pid)
+        self.client.emit('pos_pid_status', self.use_pos_pid)
         if self.use_pos_pid:
             self.send_pid_constants()
 
     def start(self):
         if not self.running:
             self._setup_filters()
-            self._setup_motors()
             self._setup_startup_state()
+            self.motor_controller.start()
             self.running = True
+            self.client.emit('robot_status', self.running)
             self.loop()
 
     def stop(self):
         self.running = False
-        self._stop_motors()
+        self.motor_controller.stop()
         print(f'Counter: {self.counter}')
-
-    def _stop_motors(self):
-        self.left_motor.stop()
-        self.left_motor.reset_motor()
-        self.left_motor.stop()
-        self.left_motor.reset_motor()
+        self.client.emit('robot_status', self.running)
 
     def _setup_comm(self):
         # self.udp_client = UdpClient(BROKER, PORT)
@@ -140,7 +120,7 @@ class BalancingRobot:
             stop_robot=self.stop,
             shutdown_robot=self.shutdown,
             save_settings=self.save_settings,
-            switch_PosPid=self.switch_PosPid
+            switch_PosPid=self.switch_pos_pid
         )
         self.client.connect()
 
@@ -158,9 +138,8 @@ class BalancingRobot:
     def loop(self):
         while self.running:
             self.control_loop_task.loop()
-            if USE_MOTORS and not USE_PROCESSED_MOTORS:
-                self.left_motor.loop()
-                self.right_motor.loop()
+            if USE_MOTORS:
+                self.motor_controller.loop()
 
     def _control_loop(self, now, dt):
         data = self.mpu.get_all_data()
@@ -205,12 +184,8 @@ class BalancingRobot:
         return angle
 
     def _get_avg_motor_steps(self):
-        if USE_PROCESSED_MOTORS:
-            left, right = self.process_motors.get_steps()
-        else:
-            left = self.left_motor.get_position()
-            right = self.right_motor.get_position()
-        avg = (left + right) / 2    # / MICROSTEPS
+        left, right = self.motor_controller.get_steps()
+        avg = (left + right) / 2
         self.data_collector.collect(avg_steps=avg)
         return avg
     
@@ -226,7 +201,6 @@ class BalancingRobot:
             self.pos_pid.set_setpoint(self.average_speed)
             output, p_pterm, p_iterm, p_dterm = self.pos_pid.update(-steps/1000, dt)
             target = self.lpf_target_angle.filter(output) if FILTER_TARGET_ANGLE else output   
-            target = max(-MAX_TARGET_ANGLE, min(MAX_TARGET_ANGLE, target))
             self.data_collector.collect(pos_pid_output=output, p_pterm=p_pterm, p_iterm=p_iterm, p_dterm=p_dterm, filtered_target_angle=target)
         else:
             target = 0.0
@@ -243,17 +217,10 @@ class BalancingRobot:
 
     def _apply_motor_speed(self, speed):
         if USE_MOTORS:
-            self.left_motor.set_velocity(speed)
-            self.right_motor.set_velocity(speed)
-        elif USE_PROCESSED_MOTORS:
-            self.process_motors.set_velocity(speed, speed)
+            self.motor_controller.set_velocity(speed, speed)
 
     def shutdown(self):
-        if USE_PROCESSED_MOTORS:
-            self.process_motors.shutdown()
-        else:
-            self.left_motor.shutdown()
-            self.right_motor.shutdown()
+        self.motor_controller.shutdown()
         try:
             if self._stop_event is not None:
                 self._stop_event.set()

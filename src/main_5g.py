@@ -4,7 +4,7 @@ from util.data_collector import DataCollector
 from util.plot_graphs import Plotter
 from robot.MPU.MyMpu6050 import MyMPU6050
 from robot.pid_controller import PidController
-from robot.stepper_motor import Stepper
+from robot.motors.stepper_motor import Stepper
 from time import time
 from smbus2 import SMBus
 from configparser import ConfigParser
