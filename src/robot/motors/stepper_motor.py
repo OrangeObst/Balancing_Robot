@@ -30,6 +30,7 @@ class Stepper:
         GPIO.setup(self.step_pin, GPIO.OUT)
         GPIO.setup(self.enable_pin, GPIO.OUT)
         GPIO.setup(self.mode_pins, GPIO.OUT)
+        GPIO.output(self.enable_pin, GPIO.LOW)
 
     def _set_direction(self, direction):
         self.dx = 1 if direction == Stepper.CW else -1

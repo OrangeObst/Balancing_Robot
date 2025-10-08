@@ -12,13 +12,13 @@ config = ConfigParser()
 config.read(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'settings.ini'))
 
 # === Config Constants ===
-USE_POS_PID = config.getboolean('Position_PID', 'USE_POS_PID')
-FILTER_TARGET_ANGLE = config.getboolean('Position_PID', 'FILTER_TARGET_ANGLE')
-DELAY = config.getfloat('Time', 'DELAY')
-COMPLEMENTARY_ALPHA = config.getfloat('MPU', 'COMPLEMENTARY_ALPHA')
-FILTER_ACCEL_ANGLE = config.getboolean('MPU', 'FILTER_ACCEL_ANGLE')
-BROKER = config.get('Communication', 'BROKER')
-PORT = config.getint('Communication', 'PORT')
+USE_POS_PID = config.getboolean('Position_PID', 'use_pos_pid')
+FILTER_TARGET_ANGLE = config.getboolean('Position_PID', 'filter_target_angle')
+DELAY = config.getfloat('Time', 'delay')
+COMPLEMENTARY_ALPHA = config.getfloat('MPU', 'complementary_alpha')
+FILTER_ACCEL_ANGLE = config.getboolean('MPU', 'filter_accel_angle')
+BROKER = config.get('Communication', 'broker')
+PORT = config.getint('Communication', 'port')
 
 
 class BalancingRobot:
@@ -63,9 +63,10 @@ class BalancingRobot:
         return constants
 
     def set_pid_constants(self, constants):
-        self.angle_pid.set_parameters(constants['ap'], constants['ai'], constants['ad'])
+        print(constants)
+        self.angle_pid.set_constants(constants['ap'], constants['ai'], constants['ad'])
         if self.use_pos_pid:
-            self.pos_pid.set_parameters(constants['pp'], constants['pi'], constants['pd'])
+            self.pos_pid.set_constants(constants['pp'], constants['pi'], constants['pd'])
 
     def send_pid_constants(self):
         constants = self._get_pid_constants()
@@ -78,18 +79,18 @@ class BalancingRobot:
         global config
         mpu_offsets = self.mpu.get_all_offsets()
         pid_constants = self._get_pid_constants()
-        config['MPU']['AX_OFFSET'] = str(mpu_offsets[0])
-        config['MPU']['AY_OFFSET'] = str(mpu_offsets[1])
-        config['MPU']['AZ_OFFSET'] = str(mpu_offsets[2])
-        config['MPU']['GX_OFFSET'] = str(mpu_offsets[3])
-        config['MPU']['GY_OFFSET'] = str(mpu_offsets[4])
-        config['MPU']['GZ_OFFSET'] = str(mpu_offsets[5])
-        config['Angle_PID']['AP'] = str(pid_constants['ap'])
-        config['Angle_PID']['AI'] = str(pid_constants['ai'])
-        config['Angle_PID']['AD'] = str(pid_constants['ad'])
-        config['Position_PID']['PP'] = str(pid_constants['pp'])
-        config['Position_PID']['PI'] = str(pid_constants['pi'])
-        config['Position_PID']['PD'] = str(pid_constants['pd'])
+        config['MPU']['ax_offset'] = str(mpu_offsets[0])
+        config['MPU']['ay_offset'] = str(mpu_offsets[1])
+        config['MPU']['az_offset'] = str(mpu_offsets[2])
+        config['MPU']['gx_offset'] = str(mpu_offsets[3])
+        config['MPU']['gy_offset'] = str(mpu_offsets[4])
+        config['MPU']['gz_offset'] = str(mpu_offsets[5])
+        config['Angle_PID']['ap'] = str(pid_constants['ap'])
+        config['Angle_PID']['ai'] = str(pid_constants['ai'])
+        config['Angle_PID']['ad'] = str(pid_constants['ad'])
+        config['Position_PID']['pp'] = str(pid_constants['pp'])
+        config['Position_PID']['pi'] = str(pid_constants['pi'])
+        config['Position_PID']['pd'] = str(pid_constants['pd'])
         with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'settings.ini'), 'w') as settingsfile:
             config.write(settingsfile)
 
@@ -104,6 +105,7 @@ class BalancingRobot:
 
     def deactivate_processed_motors(self):
         self.motor_controller.deactivate_processed_motors()
+        self._reset_pids()
 
     def start(self):
         if not self.running:
@@ -116,9 +118,14 @@ class BalancingRobot:
 
     def stop(self):
         self.motor_controller.stop()
+        self._reset_pids()
         self.running = False
         print(f'Counter: {self.counter}')
         self.client.emit('robot_status', self.running)
+
+    def _reset_pids(self):
+        self.angle_pid.reset_controller()
+        self.pos_pid.reset_controller()
 
     def _setup_comm(self):
         self.udp_client = UdpClient(BROKER, PORT)
@@ -235,5 +242,5 @@ class BalancingRobot:
         try:
             if self._stop_event is not None:
                 self._stop_event.set()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Error during robot shutdown: {e}")

@@ -60,9 +60,9 @@ class PidController(object):
         self.sum_error = 0.0
 
 
-    def set_parameters(self, p = None, i = None, d = None):
+    def set_constants(self, p = None, i = None, d = None):
         """
-            Set or update the PID controller parameters.
+            Set or update the PID controller constants.
 
             Args:
                 p (float, optional): Proportional gain. Defaults to None.
@@ -70,9 +70,11 @@ class PidController(object):
                 d (float, optional): Derivative gain. Defaults to None.
 
             Notes:
-                Only the parameters provided (not None) will update the controller.
+                Resets the controller state before updating constants.
+                Only the constants provided (not None) will update the controller.
                 Updates the corresponding attributes (kp, ki, kd) if the input is not None.
         """
+        self.reset_controller()
         if p is not None:
             self.kp = p
         if i is not None:

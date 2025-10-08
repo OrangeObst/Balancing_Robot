@@ -1,14 +1,12 @@
+from .processed_motors import MultiprocessingStepper
+
 class MotorController:
     def __init__(self, left_motor, right_motor, use_motors=False, processed=False):
         self.use_motors = use_motors
-        if processed:
-            from processed_motors import MultiprocessingStepper
-            self.processed_motors = MultiprocessingStepper(left_motor, right_motor)
-            self.processed = True
-        else:
-            self.left_motor = left_motor
-            self.right_motor = right_motor
-            self.processed = False
+        self.processed = processed
+        self.left_motor = left_motor
+        self.right_motor = right_motor
+        self.processed_motors = MultiprocessingStepper(left_motor, right_motor)
 
     def start(self):
         if self.processed:
@@ -25,8 +23,9 @@ class MotorController:
             self.right_motor.reset_motor()
 
     def activate_processed_motors(self):
-        self.processed = True
-        self.processed_motors.start()
+        if not self.processed:
+            self.processed = True
+            self.processed_motors.start()
 
     def deactivate_processed_motors(self):
         self.processed = False

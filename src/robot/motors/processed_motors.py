@@ -6,7 +6,7 @@ class MultiprocessingStepper():
         self.left_motor = left_motor_motor
         self.right_motor = right_motor_motor
 
-        self.run_process = multiprocessing.Value('b', True)
+        self.run_process = multiprocessing.Value('b', False)
         self.left_motor_velocity = multiprocessing.Value('f', 0.0)
         self.right_motor_velocity = multiprocessing.Value('f', 0.0)
         self.velocity_update_event = multiprocessing.Event()
@@ -42,18 +42,28 @@ class MultiprocessingStepper():
 
     def get_steps(self):
         self.want_step_update_event.set()
-        self.done_step_update_event.wait(timeout=1.0)
+        self.done_step_update_event.wait(timeout=0.02)
         self.done_step_update_event.clear()
         return self.left_motor_steps.value, self.right_motor_steps.value
     
     def start(self):
+        self.run_process.value = True
         self.left_motor.start()
         self.right_motor.start()
+        if not self.motor_loop_process.is_alive():
+            self.motor_loop_process = multiprocessing.Process(target=self._run)
         self.motor_loop_process.start()
+
+    def stop(self):
+        self.run_process.value = False
+        time.sleep(0.05)
+        self.motor_loop_process.join()
+        self.left_motor.reset_motor()
+        self.right_motor.reset_motor()
 
     def shutdown(self):
         self.run_process.value = False
-        time.sleep(0.1)
+        time.sleep(0.05)
         self.motor_loop_process.join()
         self.left_motor.shutdown()
         self.right_motor.shutdown()

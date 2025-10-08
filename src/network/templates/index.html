@@ -36,7 +36,7 @@
         #constantsFormContainer {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
+            gap: 10px;
             width: 100%;
         }
 
@@ -71,8 +71,15 @@
 
         .updateButtonAlignment {
             display: flex;
+            flex-direction: column;
             justify-content: baseline;
-            align-items: baseline;
+            align-items: flex-start;
+        }
+
+        .buttonRow {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 5px;
         }
 
         .btnAdj {
@@ -108,19 +115,46 @@
             width: 100% !important;
             height: 100% !important;
         }
+
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            border-bottom: 1px dotted black;
+            cursor: pointer;
+        }
+
+        .tooltiptext {
+            visibility: hidden;
+            width: 130px;
+            background-color: black;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 1;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+        }
     </style>
 </head>
 
 <body>
     <div id="topContainer">
         <div class="updateButtonAlignment">
-            <button type="button" id="startRobotButton" class="updateButton">Start Robot</button>
-            <button type="button" id="stopRobotButton" class="updateButton">Stop Robot</button>
-            <button type="button" id="calibrateMpuButton" class="updateButton">Calibrate MPU</button>
-            <button type="button" id="shutdownRobotButton" class="updateButton">Shutdown Robot</button>
-            <button type="button" id="saveSettingsButton" class="updateButton">Save Settings</button>
-            <button type="button" id="activateMotors" class="updateButton">Save Settings</button>
-            <button type="button" id="deactivateMotors" class="updateButton">Save Settings</button>
+            <div class="buttonRow">
+                <button type="button" id="startRobotButton" class="updateButton">Start Robot</button>
+                <button type="button" id="stopRobotButton" class="updateButton">Stop Robot</button>
+                <button type="button" id="shutdownRobotButton" class="updateButton">Shutdown Robot</button>
+            </div>
+            <div class="buttonRow">
+                <button type="button" id="calibrateMpuButton" class="updateButton">Calibrate MPU</button>
+                <button type="button" id="saveSettingsButton" class="updateButton">Save Settings</button>
+                <button type="button" id="activateMotors" class="updateButton" title="Activate multiprocessed motors">Activate MP Motors</button>
+                <button type="button" id="deactivateMotors" class="updateButton" title="Deactivate multiprocessed motors">Deactivate MP Motors</button>
+            </div>
         </div>
         <div class="vertical-divider"></div>
         <div id="rightSide">
@@ -130,7 +164,7 @@
                     <div id="anglePIDGroup" class="pidGroup"></div>
                     <div id="positionPIDGroup" class="pidGroup"></div>
                 </div>
-                <div class="updateButtonAlignment">
+                <div class="buttonRow">
                     <button type="button" id="sendConstantsButton" class="updateButton">Send Constants</button>
                     <button type="button" id="switchPosPidButton" class="updateButton">Turn On/Off Pos PID</button>
                 </div>
@@ -145,7 +179,7 @@
         <div id="leftSide">
             <h3>Trackable values</h3>
             <div id="checkboxContainer"></div>
-            <div class="updateButtonAlignment">
+            <div class="buttonRow">
                 <button type="button" id="updateChartButton" class="updateButton">Update Chart</button>
                 <button type="button" id="clearGraphButton" class="updateButton">Clear Graph</button>
             </div>
