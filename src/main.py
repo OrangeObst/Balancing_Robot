@@ -9,8 +9,6 @@ from configparser import ConfigParser
 from threading import Event
 import signal
 import os
-import time
-
 
 config = ConfigParser()
 script_dir = os.path.dirname(os.path.abspath(__file__))

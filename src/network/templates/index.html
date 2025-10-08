@@ -119,6 +119,8 @@
             <button type="button" id="calibrateMpuButton" class="updateButton">Calibrate MPU</button>
             <button type="button" id="shutdownRobotButton" class="updateButton">Shutdown Robot</button>
             <button type="button" id="saveSettingsButton" class="updateButton">Save Settings</button>
+            <button type="button" id="activateMotors" class="updateButton">Save Settings</button>
+            <button type="button" id="deactivateMotors" class="updateButton">Save Settings</button>
         </div>
         <div class="vertical-divider"></div>
         <div id="rightSide">
@@ -391,6 +393,14 @@
         
         document.getElementById('switchPosPidButton').addEventListener('click', function () {
             socket.emit('switch_PosPid');
+        });
+
+        document.getElementById('activateMotors').addEventListener('click', function () {
+            socket.emit('activateMotors');
+        });
+
+        document.getElementById('deactivateMotors').addEventListener('click', function () {
+            socket.emit('deactivateMotors');
         });
 
         document.getElementById('sendConstantsButton').addEventListener('click', function () {

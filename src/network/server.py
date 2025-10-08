@@ -61,5 +61,13 @@ def handle_save_settings():
 def handle_switch_PosPid():
     socketio.emit('switch_PosPid', namespace='/robot')
 
+@socketio.on('activateMotors', namespace='/client')
+def handle_activate_motors():
+    socketio.emit('activate_motors', namespace='/robot')
+
+@socketio.on('deactivateMotors', namespace='/client')
+def handle_deactivate_motors():
+    socketio.emit('deactivate_motors', namespace='/robot')
+
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0')

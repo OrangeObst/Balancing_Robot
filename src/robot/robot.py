@@ -15,7 +15,6 @@ config.read(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 USE_POS_PID = config.getboolean('Position_PID', 'USE_POS_PID')
 FILTER_TARGET_ANGLE = config.getboolean('Position_PID', 'FILTER_TARGET_ANGLE')
 DELAY = config.getfloat('Time', 'DELAY')
-USE_MOTORS = config.getboolean('Motor', 'USE_MOTORS')
 COMPLEMENTARY_ALPHA = config.getfloat('MPU', 'COMPLEMENTARY_ALPHA')
 FILTER_ACCEL_ANGLE = config.getboolean('MPU', 'FILTER_ACCEL_ANGLE')
 BROKER = config.get('Communication', 'BROKER')
@@ -99,19 +98,25 @@ class BalancingRobot:
         self.client.emit('pos_pid_status', self.use_pos_pid)
         if self.use_pos_pid:
             self.send_pid_constants()
+    
+    def activate_processed_motors(self):
+        self.motor_controller.activate_processed_motors()
+
+    def deactivate_processed_motors(self):
+        self.motor_controller.deactivate_processed_motors()
 
     def start(self):
         if not self.running:
+            self.motor_controller.start()
             self._setup_filters()
             self._setup_startup_state()
-            self.motor_controller.start()
             self.running = True
             self.client.emit('robot_status', self.running)
             self.loop()
 
     def stop(self):
-        self.running = False
         self.motor_controller.stop()
+        self.running = False
         print(f'Counter: {self.counter}')
         self.client.emit('robot_status', self.running)
 
@@ -125,7 +130,9 @@ class BalancingRobot:
             stop_robot=self.stop,
             shutdown_robot=self.shutdown,
             save_settings=self.save_settings,
-            switch_pos_pid=self.switch_pos_pid
+            switch_pos_pid=self.switch_pos_pid,
+            activate_motors=self.activate_processed_motors,
+            deactivate_motors=self.deactivate_processed_motors
         )
         self.client.connect()
 
@@ -143,8 +150,7 @@ class BalancingRobot:
     def loop(self):
         while self.running:
             self.control_loop_task.loop()
-            if USE_MOTORS:
-                self.motor_controller.loop()
+            self.motor_controller.loop()
 
     def _control_loop(self, now, dt):
         data = self.mpu.get_all_data()
@@ -153,8 +159,8 @@ class BalancingRobot:
             speed = self._run_control_logic(angle, dt)
             self._apply_motor_speed(speed)
             self._update_average_speed(speed)
-        # self.client.emit('data', self.data_collector.get_latest())
-        self.udp_client.send(self.data_collector.get_latest())
+        self.client.emit('data', self.data_collector.get_latest())
+        # self.udp_client.send(self.data_collector.get_latest())
         self.data_collector.snapshot()
         self.counter += 1
 
@@ -222,8 +228,7 @@ class BalancingRobot:
         return speed
 
     def _apply_motor_speed(self, speed):
-        if USE_MOTORS:
-            self.motor_controller.set_velocity(speed, speed)
+        self.motor_controller.set_velocity(speed, speed)
 
     def shutdown(self):
         self.motor_controller.shutdown()

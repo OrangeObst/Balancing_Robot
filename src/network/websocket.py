@@ -1,7 +1,7 @@
 import socketio
 
 class WebsocketClient:
-    def __init__(self, set_pid_constants, get_pid_constants, calibrate_mpu, start_robot, stop_robot, shutdown_robot, save_settings, switch_pos_pid, server_url='http://127.0.0.1:5000'):
+    def __init__(self, set_pid_constants, get_pid_constants, calibrate_mpu, start_robot, stop_robot, shutdown_robot, save_settings, switch_pos_pid, activate_motors, deactivate_motors, server_url='http://127.0.0.1:5000'):
         self.sio = socketio.Client()
         self.server_url = server_url
 
@@ -40,6 +40,14 @@ class WebsocketClient:
         @self.sio.on('switch_pos_pid', namespace='/robot')
         def switch_pos_pid():
             switch_pos_pid()
+
+        @self.sio.on('activate_motors', namespace='/robot')
+        def activate_motors():
+            activate_motors()
+
+        @self.sio.on('deactivate_motors', namespace='/robot')
+        def deactivate_motors():
+            deactivate_motors()
 
     def connect(self):
         self.sio.connect(self.server_url, namespaces=['/robot'])
