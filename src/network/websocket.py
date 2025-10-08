@@ -37,7 +37,7 @@ class WebsocketClient:
         def on_save_settings():
             save_settings()
 
-        @self.sio.on('switch_PosPid', namespace='/robot')
+        @self.sio.on('switch_pos_pid', namespace='/robot')
         def switch_pos_pid():
             switch_pos_pid()
 

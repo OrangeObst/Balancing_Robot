@@ -80,9 +80,9 @@ class PidController(object):
         if d is not None:
             self.kd = d
 
-    def get_parameters(self):
+    def get_constants(self):
         """
-            Get the current PID controller parameters.
+            Get the current PID controller constants.
         """
         return {
             'kp': self.kp,

@@ -50,22 +50,27 @@ class BalancingRobot:
         self.lpf_target_angle = LowPassFilter(alpha)
         self.alpha = COMPLEMENTARY_ALPHA
 
+    def _get_pid_constants(self):
+        angle_constants = self.angle_pid.get_constants()
+        position_constants = self.pos_pid.get_constants()
+        constants = {
+            'ap': angle_constants['kp'],
+            'ai': angle_constants['ki'],
+            'ad': angle_constants['kd'],
+            'pp': position_constants['kp'],
+            'pi': position_constants['ki'],
+            'pd': position_constants['kd'],
+        }
+        return constants
+
     def set_pid_constants(self, constants):
         self.angle_pid.set_parameters(constants['ap'], constants['ai'], constants['ad'])
         if self.use_pos_pid:
             self.pos_pid.set_parameters(constants['pp'], constants['pi'], constants['pd'])
 
     def send_pid_constants(self):
-        constants = {
-            'ap': self.angle_pid.kp,
-            'ai': self.angle_pid.ki,
-            'ad': self.angle_pid.kd,
-            'pp': self.pos_pid.kp if self.use_pos_pid else 0.0,
-            'pi': self.pos_pid.ki if self.use_pos_pid else 0.0,
-            'pd': self.pos_pid.kd if self.use_pos_pid else 0.0,
-        }
+        constants = self._get_pid_constants()
         self.client.emit('pid_constants', constants)
-
     
     def calibrate_mpu(self, duration=3):
         self.mpu.calibrate_sensor(duration)
@@ -73,7 +78,7 @@ class BalancingRobot:
     def save_settings(self):
         global config
         mpu_offsets = self.mpu.get_all_offsets()
-        pid_constants = self.get_pid_constants()
+        pid_constants = self._get_pid_constants()
         config['MPU']['AX_OFFSET'] = str(mpu_offsets[0])
         config['MPU']['AY_OFFSET'] = str(mpu_offsets[1])
         config['MPU']['AZ_OFFSET'] = str(mpu_offsets[2])
@@ -111,7 +116,7 @@ class BalancingRobot:
         self.client.emit('robot_status', self.running)
 
     def _setup_comm(self):
-        # self.udp_client = UdpClient(BROKER, PORT)
+        self.udp_client = UdpClient(BROKER, PORT)
         self.client = WebsocketClient(
             set_pid_constants=self.set_pid_constants,
             get_pid_constants=self.send_pid_constants,
@@ -120,7 +125,7 @@ class BalancingRobot:
             stop_robot=self.stop,
             shutdown_robot=self.shutdown,
             save_settings=self.save_settings,
-            switch_PosPid=self.switch_pos_pid
+            switch_pos_pid=self.switch_pos_pid
         )
         self.client.connect()
 
@@ -148,7 +153,8 @@ class BalancingRobot:
             speed = self._run_control_logic(angle, dt)
             self._apply_motor_speed(speed)
             self._update_average_speed(speed)
-        self.client.emit('data', self.data_collector.get_latest())
+        # self.client.emit('data', self.data_collector.get_latest())
+        self.udp_client.send(self.data_collector.get_latest())
         self.data_collector.snapshot()
         self.counter += 1
 

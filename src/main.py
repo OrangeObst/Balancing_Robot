@@ -1,4 +1,3 @@
-
 from robot.motors.motor_controller import MotorController
 from robot.robot import BalancingRobot
 from util.data_collector import DataCollector
