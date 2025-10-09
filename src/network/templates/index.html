@@ -105,7 +105,7 @@
 
         #chartContainer {
             position: relative;
-            width: 80%;
+            width: 70%;
             max-width: 1200px;
             height: 600px;
         }
@@ -161,7 +161,7 @@
                 border-color: #FFB161;
                 box-shadow: 0px 0px 4px 1px #FFC182;
             }
-            
+
             &.disconnected:before {
                 background-color: #C9404D;
                 border-color: #C42C3B;
@@ -185,6 +185,12 @@
     <div id="topContainer">
         <div>
             <h2>Balancing Robot Status Panel</h2>
+            <div>
+                <label for="robotSelect">Select Robot:</label>
+                <select id="robotSelect">
+                    <option value="" disabled selected>Select a robot</option>
+                </select>
+            </div>
             <h3 id="robotName">Connected to: <span></span></h3>
             <ul>
                 <li id="status-running" class="status running">Running</li>
@@ -194,16 +200,23 @@
         </div>
         <div class="vertical-divider"></div>
         <div class="updateButtonAlignment">
+            <div>
+                <h2>Robot Controls</h2>
+            </div>
             <div class="buttonRow">
                 <button type="button" id="startRobotButton" class="updateButton">Start Robot</button>
                 <button type="button" id="stopRobotButton" class="updateButton">Stop Robot</button>
                 <button type="button" id="shutdownRobotButton" class="updateButton">Shutdown Robot</button>
             </div>
             <div class="buttonRow">
-                <button type="button" id="startMotors" class="updateButton" title="Start multiprocessed motors">Start MP Motors</button>
-                <button type="button" id="stopMotors" class="updateButton" title="Stop multiprocessed motors">Stop MP Motors</button>
-                <button type="button" id="activateMotors" class="updateButton" title="Activate multiprocessed motors">Activate MP Motors</button>
-                <button type="button" id="deactivateMotors" class="updateButton" title="Deactivate multiprocessed motors">Deactivate MP Motors</button>
+                <button type="button" id="startMotors" class="updateButton" title="Start multiprocessed motors">Start MP
+                    Motors</button>
+                <button type="button" id="stopMotors" class="updateButton" title="Stop multiprocessed motors">Stop MP
+                    Motors</button>
+                <button type="button" id="activateMotors" class="updateButton"
+                    title="Activate multiprocessed motors">Activate MP Motors</button>
+                <button type="button" id="deactivateMotors" class="updateButton"
+                    title="Deactivate multiprocessed motors">Deactivate MP Motors</button>
             </div>
             <div>
                 <button type="button" id="calibrateMpuButton" class="updateButton">Calibrate MPU</button>
@@ -212,7 +225,7 @@
         </div>
         <div class="vertical-divider"></div>
         <div id="pidCalibration">
-            <h3>PID Constants</h3>
+            <h2>PID Constants</h2>
             <div id="constantsForm">
                 <div id="constantsFormContainer">
                     <div id="anglePIDGroup" class="pidGroup"></div>
@@ -486,6 +499,23 @@
             }
         });
 
+        socket.emit('get_robot_list');
+
+        socket.on('robot_list', function(list) {
+            const select = document.getElementById('robotSelect');
+            select.innerHTML = '';
+            list.forEach(robot => {
+                const option = document.createElement('option');
+                option.value = robot.id;
+                option.textContent = robot.name;
+                select.appendChild(option);
+            });
+        });
+
+        document.getElementById('robotSelect').addEventListener('change', function() {
+            socket.emit('subscribe_robot', {robot_id: this.value});
+        });
+
         document.getElementById('startRobotButton').addEventListener('click', function () {
             socket.emit('start_robot');
         });
@@ -505,7 +535,7 @@
         document.getElementById('saveSettingsButton').addEventListener('click', function () {
             socket.emit('save_settings');
         });
-        
+
         document.getElementById('switchPosPidButton').addEventListener('click', function () {
             socket.emit('switch_PosPid');
         });

@@ -74,5 +74,11 @@ class WebsocketClient:
     def connect(self):
         self.sio.connect(self.server_url, namespaces=['/robot'])
 
+    def disconnect(self):
+        self.sio.disconnect()
+
+    def register_robot(self, data):
+        self.sio.emit('register_robot', data=data, namespace='/robot')
+
     def emit(self, event, data):
         self.sio.emit(event, data=data, namespace='/robot')

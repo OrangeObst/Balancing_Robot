@@ -24,7 +24,7 @@ PORT = config.getint('Communication', 'port')
 
 class BalancingRobot:
     def __init__(self, motor_controller, mpu, angle_pid, pos_pid, data_collector, stop_event=None):
-        self.name = 'IAV_SD_5B_0328'
+        self.name = 'IAV_SBR_5B_0328'
         self.motor_controller = motor_controller
         self.mpu = mpu
 
@@ -45,12 +45,14 @@ class BalancingRobot:
 
         self.control_loop_task = TimedTask(delay=DELAY, run=self._control_loop)
 
+    # Setup low-pass filters for angle and target angle
     def _setup_filters(self):
         alpha = 0.8
         self.lpf_accel_angle = LowPassFilter(alpha)
         self.lpf_target_angle = LowPassFilter(alpha)
         self.alpha = COMPLEMENTARY_ALPHA
 
+    # Get current PID constants as a dictionary
     def _get_pid_constants(self):
         angle_constants = self.angle_pid.get_constants()
         position_constants = self.pos_pid.get_constants()
@@ -64,12 +66,13 @@ class BalancingRobot:
         }
         return constants
 
+    # Set PID constants from a dictionary
     def set_pid_constants(self, constants):
-        print(constants)
         self.angle_pid.set_constants(constants['ap'], constants['ai'], constants['ad'])
         if self.use_pos_pid:
             self.pos_pid.set_constants(constants['pp'], constants['pi'], constants['pd'])
 
+    # Send robot-specific data to the server
     def send_robot_specific_data(self):
         data = {
             'name': self.name,
@@ -79,9 +82,11 @@ class BalancingRobot:
         }
         self.client.emit('robot_data', data)
     
+    # Calibrate the MPU sensor for a given duration
     def calibrate_mpu(self, duration=3):
         self.mpu.calibrate_sensor(duration)
 
+    # Save current settings to the configuration file
     def save_settings(self):
         global config
         mpu_offsets = self.mpu.get_all_offsets()
@@ -101,47 +106,56 @@ class BalancingRobot:
         with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'settings.ini'), 'w') as settingsfile:
             config.write(settingsfile)
 
+    # Toggle position PID controller
     def switch_pos_pid(self):
         self.use_pos_pid = not self.use_pos_pid
         self.client.emit('pos_pid_status', self.use_pos_pid)
         if self.use_pos_pid:
             self.send_pid_constants()
     
+    # Sets the enable pins to HIGH
     def start_processed_motors(self):
         self.motor_controller.start()
 
+    # Sets the enable pins to LOW
     def stop_processed_motors(self):
         self.motor_controller.stop()
 
+    # Activates the multiprocessed motor control
     def activate_processed_motors(self):
         self.motor_controller.activate_processed_motors()
 
+    # Deactivates the multiprocessed motor control
     def deactivate_processed_motors(self):
         self.motor_controller.deactivate_processed_motors()
         self._reset_pids()
 
     # TODO: Change robot status to send all relevant data at once
+    # Enables motors, resets filters and starts the robot control loop
     def start(self):
         if not self.running.value:
-            self.motor_controller.start()
+            self.start_processed_motors()
             self._setup_filters()
             self._setup_startup_state()
+            self._reset_pids()
             self.running.value = True
             self.client.emit('robot_status', self.running.value)
             self.loop()
 
     # TODO: Motors turn strangely slow after stopping and starting again
+    # Disables motors and stops the robot control loop
     def stop(self):
         self.motor_controller.stop()
-        self._reset_pids()
         self.running.value = False
         print(f'Counter: {self.counter}')
         self.client.emit('robot_status', self.running.value)
 
+    # Reset both PID controllers to prevent issues at restart
     def _reset_pids(self):
         self.angle_pid.reset_controller()
         self.pos_pid.reset_controller()
 
+    # Setup websocket and UDP communication with callback methods
     def _setup_comm(self):
         self.udp_client = UdpClient(BROKER, PORT)
         self.client = WebsocketClient(
@@ -160,7 +174,9 @@ class BalancingRobot:
             server_url=f'http://127.0.0.1:5000'            # server_url=f'http://{BROKER}:{PORT}'
         )
         self.client.connect()
+        self.client.register_robot({'name': self.name})
 
+    # Set variables to initial state
     def _setup_startup_state(self):
         self.previous_angle = 0.0
         self.average_speed = 0.0
@@ -177,6 +193,7 @@ class BalancingRobot:
             self.control_loop_task.loop()       # Tasks that run at fixed intervals
             self.motor_controller.loop()
 
+    # Main control loop that runs at fixed intervals
     def _control_loop(self, now, dt):
         data = self.mpu.get_all_data()
         angle = self._calculate_angle(data, dt)
@@ -189,6 +206,7 @@ class BalancingRobot:
         self.data_collector.snapshot()
         self.counter += 1
 
+    # Check if the robot's angle is stable enough to start balancing
     def _check_startup_stability(self, angle, now):
         if self.startup_angle_stable:
             return True
@@ -204,12 +222,14 @@ class BalancingRobot:
         print(f'Angle: {angle:.4f} | Angle counter: {self.within_angle_count}')
         return self.startup_angle_stable
 
+    # Run the main control logic
     def _run_control_logic(self, angle, dt):
         steps = self._get_avg_motor_steps()
         target_angle = self._get_target_angle(steps, dt)
         speed = self._update_angle_pid(target_angle, angle, dt)
         return speed
 
+    # Calculate the current angle using a complementary filter
     def _calculate_angle(self, data, dt):
         accel = degrees(atan2(data[0], max(1e-6, sqrt(data[1]**2 + data[2]**2))))
         gyro = self.previous_angle + data[4] * dt
@@ -220,19 +240,22 @@ class BalancingRobot:
         self.data_collector.collect(angle=angle, accel_angle=accel, gyro_angle=gyro)
         return angle
 
+    # Get average motor steps from both motors
     def _get_avg_motor_steps(self):
         left, right = self.motor_controller.get_steps()
         avg = (left + right) / 2
         self.data_collector.collect(avg_steps=avg)
         return avg
     
+    # Update average speed based on current speed
     def _update_average_speed(self, speed):
-        # Update average speed based on the current speed and return speed in steps per second
         self.average_speed = 0.5 * self.average_speed + 0.5 * speed         # avg_speed in %
     
+    # Convert average speed percentage to steps per second
     def _get_average_speed_in_steps_per_second(self):
         return (self.average_speed / 100) * 3000                            # avg_speed in steps per second
 
+    # Uses position PID to get target angle based on motor steps
     def _get_target_angle(self, steps, dt):
         if self.use_pos_pid:
             self.pos_pid.set_setpoint(self.average_speed)
@@ -245,6 +268,7 @@ class BalancingRobot:
         self.data_collector.collect(target_angle=target)
         return target
 
+    # Update angle PID and return speed output
     def _update_angle_pid(self, target, angle, dt):
         self.angle_pid.set_setpoint(target)
         output, a_pterm, a_iterm, a_dterm = self.angle_pid.update(angle, dt)
@@ -252,9 +276,11 @@ class BalancingRobot:
         self.data_collector.collect(speed=output, a_pterm=a_pterm, a_iterm=a_iterm, a_dterm=a_dterm)
         return speed
 
+    # Apply calculated speed to both motors
     def _apply_motor_speed(self, speed):
         self.motor_controller.set_velocity(speed, speed)
 
+    # Shutdown the robot safely
     def shutdown(self):
         self.motor_controller.shutdown()
         try:
