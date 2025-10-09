@@ -1,3 +1,4 @@
+import socket
 from robot.motors.motor_controller import MotorController
 from robot.robot import BalancingRobot
 from util.data_collector import DataCollector
@@ -34,6 +35,12 @@ CALIBRATE = config.getboolean('MPU', 'calibrate')                               
 
 # Data logging
 LOG_DATA = config.getboolean('Logging', 'log_data')                                 # De-/activate data logging
+        
+hostname = socket.gethostname()
+IPAddr = socket.gethostbyname(hostname)
+
+print("Your Computer Name is:" + hostname)
+print("Your Computer IP Address is:" + IPAddr)
 
 
 if __name__ == "__main__":

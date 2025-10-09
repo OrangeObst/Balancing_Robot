@@ -17,7 +17,6 @@
         #topContainer {
             display: flex;
             gap: 10px;
-            max-width: 1600px;
             margin-bottom: 5px;
             font-size: small;
         }
@@ -26,7 +25,7 @@
             min-width: 300px;
         }
 
-        #rightSide {
+        #pidCalibration {
             flex: 1;
             min-width: 300px;
             flex-direction: column;
@@ -138,11 +137,62 @@
         .tooltip:hover .tooltiptext {
             visibility: visible;
         }
+
+        body {
+            margin: 25px;
+        }
+
+
+        ul {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .status {
+            &.running:before {
+                background-color: #94E185;
+                border-color: #78D965;
+                box-shadow: 0px 0px 4px 1px #94E185;
+            }
+
+            &.standby:before {
+                background-color: #FFC182;
+                border-color: #FFB161;
+                box-shadow: 0px 0px 4px 1px #FFC182;
+            }
+            
+            &.disconnected:before {
+                background-color: #C9404D;
+                border-color: #C42C3B;
+                box-shadow: 0px 0px 4px 1px #C9404D;
+            }
+
+            &:before {
+                content: ' ';
+                display: inline-block;
+                width: 7px;
+                height: 7px;
+                margin-right: 10px;
+                border: 1px solid #000;
+                border-radius: 7px;
+            }
+        }
     </style>
 </head>
 
 <body>
     <div id="topContainer">
+        <div>
+            <h2>Balancing Robot Status Panel</h2>
+            <h3 id="robotName">Connected to: <span></span></h3>
+            <ul>
+                <li id="status-running" class="status running">Running</li>
+                <li id="status-standby" class="status standby">Standby</li>
+                <li id="status-disconnected" class="status disconnected">Disconnected</li>
+            </ul>
+        </div>
+        <div class="vertical-divider"></div>
         <div class="updateButtonAlignment">
             <div class="buttonRow">
                 <button type="button" id="startRobotButton" class="updateButton">Start Robot</button>
@@ -161,7 +211,7 @@
             </div>
         </div>
         <div class="vertical-divider"></div>
-        <div id="rightSide">
+        <div id="pidCalibration">
             <h3>PID Constants</h3>
             <div id="constantsForm">
                 <div id="constantsFormContainer">
@@ -197,7 +247,7 @@
             "angle", "accel_angle", "gyro_angle", "target_angle",
             "a_pterm", "a_iterm", "a_dterm", "speed",
             "p_pterm", "p_iterm", "p_dterm", "pos_output",
-            "avg_steps", "avg_steps_per_second"
+            "avg_steps"
         ];
 
         const checkboxContainer = document.getElementById('checkboxContainer');
@@ -358,6 +408,14 @@
             angleChart.update();
         }
 
+        let robotConnected = true; // Assume connected initially until told otherwise
+        let robotRunning = false;
+        function updateStatusDisplay(isConnected, isRunning) {
+            document.getElementById('status-running').style.display = (isConnected && isRunning) ? 'list-item' : 'none';
+            document.getElementById('status-standby').style.display = (isConnected && !isRunning) ? 'list-item' : 'none';
+            document.getElementById('status-disconnected').style.display = (!isConnected) ? 'list-item' : 'none';
+        }
+
         socket.on('data', function (dataWrapper) {
             const data = dataWrapper.data || dataWrapper;
             angleChart.data.labels.push('');
@@ -378,25 +436,44 @@
             angleChart.update('none');
         });
 
-        socket.on('pid_constants', function (constants) {
-            Object.keys(constants).forEach(function (key) {
+        socket.on('robot_data', function (data) {
+            //'name'
+            //'pid_constants'
+            //'use_pos_pid' 
+            //'running'
+            Object.keys(data.pid_constants).forEach(function (key) {
                 var slider = document.getElementById("slider_" + key);
                 var label = document.getElementById("label_" + key);
                 if (slider && label) {
-                    slider.value = constants[key];
-                    label.innerHTML = Number(constants[key]);
+                    slider.value = data.pid_constants[key];
+                    label.innerHTML = Number(data.pid_constants[key]);
                 }
-                console.log(constants[key])
+                console.log(data.pid_constants[key])
             });
+
+            if (data.name) {
+                document.querySelector('#robotName span').textContent = data.name;
+            }
+
+            if (data.running) {
+                robotRunning = true;
+            } else {
+                robotRunning = false;
+            }
+            updateStatusDisplay(robotConnected, robotRunning);
         });
 
         socket.on('robot_status', function (status) {
             if (status) {
                 document.getElementById('startRobotButton').disabled = true;
                 document.getElementById('stopRobotButton').disabled = false;
+                robotRunning = true;
+                updateStatusDisplay(robotConnected, robotRunning);
             } else {
                 document.getElementById('startRobotButton').disabled = false;
                 document.getElementById('stopRobotButton').disabled = true;
+                robotRunning = false;
+                updateStatusDisplay(robotConnected, robotRunning);
             }
         });
 

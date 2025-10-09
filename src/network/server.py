@@ -27,6 +27,10 @@ def handle_pos_pid_status(payload):
 def handle_robot_status(payload):
     socketio.emit('robot_status', payload, namespace='/client')
 
+@socketio.on('robot_data', namespace='/robot')
+def handle_robot_status(payload):
+    socketio.emit('robot_data', payload, namespace='/client')
+
 # ===== From Client to Robot ===== 
 
 @socketio.on('connect', namespace='/client')

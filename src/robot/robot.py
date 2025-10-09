@@ -24,6 +24,7 @@ PORT = config.getint('Communication', 'port')
 
 class BalancingRobot:
     def __init__(self, motor_controller, mpu, angle_pid, pos_pid, data_collector, stop_event=None):
+        self.name = 'IAV_SD_5B_0328'
         self.motor_controller = motor_controller
         self.mpu = mpu
 
@@ -69,9 +70,14 @@ class BalancingRobot:
         if self.use_pos_pid:
             self.pos_pid.set_constants(constants['pp'], constants['pi'], constants['pd'])
 
-    def send_pid_constants(self):
-        constants = self._get_pid_constants()
-        self.client.emit('pid_constants', constants)
+    def send_robot_specific_data(self):
+        data = {
+            'name': self.name,
+            'pid_constants': self._get_pid_constants(),
+            'use_pos_pid': self.use_pos_pid,
+            'running': self.running.value,
+        }
+        self.client.emit('robot_data', data)
     
     def calibrate_mpu(self, duration=3):
         self.mpu.calibrate_sensor(duration)
@@ -140,7 +146,7 @@ class BalancingRobot:
         self.udp_client = UdpClient(BROKER, PORT)
         self.client = WebsocketClient(
             set_pid_constants=self.set_pid_constants,
-            send_pid_constants=self.send_pid_constants,
+            send_robot_specific_data=self.send_robot_specific_data,
             calibrate_mpu=self.calibrate_mpu,
             start_robot=self.start,
             stop_robot=self.stop,
@@ -150,7 +156,8 @@ class BalancingRobot:
             start_motors=self.start_processed_motors,
             stop_motors=self.stop_processed_motors,
             activate_motors=self.activate_processed_motors,
-            deactivate_motors=self.deactivate_processed_motors
+            deactivate_motors=self.deactivate_processed_motors,
+            server_url=f'http://127.0.0.1:5000'            # server_url=f'http://{BROKER}:{PORT}'
         )
         self.client.connect()
 

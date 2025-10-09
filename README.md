@@ -91,3 +91,10 @@ This project showcases a self-balancing robot designed to demonstrate stability 
 
     + Angle PID is responsible for staying upright
     + Position PID is responsible for maintaining the starting position
+
+## Ideas
+
+* Seperate Server from Robot / Pi
+* Have a proper connect / register functionality, connect robot to server with name, ip and such
+* Display connected devices on frontend
+* Choose which device one wants to view or modify
