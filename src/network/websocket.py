@@ -1,7 +1,7 @@
 import socketio
 
 class WebsocketClient:
-    def __init__(self, set_pid_constants, get_pid_constants, calibrate_mpu, start_robot, stop_robot, shutdown_robot, save_settings, switch_pos_pid, activate_motors, deactivate_motors, server_url='http://127.0.0.1:5000'):
+    def __init__(self, set_pid_constants, send_pid_constants, calibrate_mpu, start_robot, stop_robot, shutdown_robot, save_settings, switch_pos_pid, start_motors, stop_motors, activate_motors, deactivate_motors, server_url='http://127.0.0.1:5000'):
         self.sio = socketio.Client()
         self.server_url = server_url
 
@@ -13,9 +13,9 @@ class WebsocketClient:
         def on_update_constants(constants):
             set_pid_constants(constants)
 
-        @self.sio.on('get_constants', namespace='/robot')
-        def on_get_constants():
-            get_pid_constants()
+        @self.sio.on('new_connection', namespace='/robot')
+        def on_new_connection():
+            send_pid_constants()
 
         @self.sio.on('calibrate_mpu', namespace='/robot')
         def on_calibrate_mpu(duration=3):
@@ -40,6 +40,14 @@ class WebsocketClient:
         @self.sio.on('switch_pos_pid', namespace='/robot')
         def on_switch_pos_pid():
             switch_pos_pid()
+
+        @self.sio.on('start_motors', namespace='/robot')
+        def on_start_motors():
+            start_motors()
+
+        @self.sio.on('stop_motors', namespace='/robot')
+        def on_stop_motors():
+            stop_motors()
 
         @self.sio.on('activate_motors', namespace='/robot')
         def on_activate_motors():

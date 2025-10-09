@@ -31,7 +31,7 @@ def handle_robot_status(payload):
 
 @socketio.on('connect', namespace='/client')
 def handle_client_connect():
-    socketio.emit('get_constants', namespace='/robot')
+    socketio.emit('new_connection', namespace='/robot')
 
 @socketio.on('update_constants', namespace='/client')
 def handle_update_constants(payload):
@@ -61,11 +61,19 @@ def handle_save_settings():
 def handle_switch_pos_pid():
     socketio.emit('switch_pos_pid', namespace='/robot')
 
-@socketio.on('activateMotors', namespace='/client')
+@socketio.on('start_motors', namespace='/client')
+def handle_start_motors():
+    socketio.emit('start_motors', namespace='/robot')
+
+@socketio.on('stop_motors', namespace='/client')
+def handle_stop_motors():
+    socketio.emit('stop_motors', namespace='/robot')
+
+@socketio.on('activate_motors', namespace='/client')
 def handle_activate_motors():
     socketio.emit('activate_motors', namespace='/robot')
 
-@socketio.on('deactivateMotors', namespace='/client')
+@socketio.on('deactivate_motors', namespace='/client')
 def handle_deactivate_motors():
     socketio.emit('deactivate_motors', namespace='/robot')
 

@@ -150,10 +150,14 @@
                 <button type="button" id="shutdownRobotButton" class="updateButton">Shutdown Robot</button>
             </div>
             <div class="buttonRow">
-                <button type="button" id="calibrateMpuButton" class="updateButton">Calibrate MPU</button>
-                <button type="button" id="saveSettingsButton" class="updateButton">Save Settings</button>
+                <button type="button" id="startMotors" class="updateButton" title="Start multiprocessed motors">Start MP Motors</button>
+                <button type="button" id="stopMotors" class="updateButton" title="Stop multiprocessed motors">Stop MP Motors</button>
                 <button type="button" id="activateMotors" class="updateButton" title="Activate multiprocessed motors">Activate MP Motors</button>
                 <button type="button" id="deactivateMotors" class="updateButton" title="Deactivate multiprocessed motors">Deactivate MP Motors</button>
+            </div>
+            <div>
+                <button type="button" id="calibrateMpuButton" class="updateButton">Calibrate MPU</button>
+                <button type="button" id="saveSettingsButton" class="updateButton">Save Settings</button>
             </div>
         </div>
         <div class="vertical-divider"></div>
@@ -429,12 +433,20 @@
             socket.emit('switch_PosPid');
         });
 
+        document.getElementById('startMotors').addEventListener('click', function () {
+            socket.emit('start_motors');
+        });
+
+        document.getElementById('stopMotors').addEventListener('click', function () {
+            socket.emit('stop_motors');
+        });
+
         document.getElementById('activateMotors').addEventListener('click', function () {
-            socket.emit('activateMotors');
+            socket.emit('activate_motors');
         });
 
         document.getElementById('deactivateMotors').addEventListener('click', function () {
-            socket.emit('deactivateMotors');
+            socket.emit('deactivate_motors');
         });
 
         document.getElementById('sendConstantsButton').addEventListener('click', function () {

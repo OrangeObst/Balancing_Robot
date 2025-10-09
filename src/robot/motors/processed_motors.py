@@ -52,12 +52,10 @@ class MultiprocessingStepper():
         self.right_motor.start()
         if not self.motor_loop_process.is_alive():
             self.motor_loop_process = multiprocessing.Process(target=self._run)
-        self.motor_loop_process.start()
+            self.motor_loop_process.start()
 
     def stop(self):
         self.run_process.value = False
-        time.sleep(0.05)
-        self.motor_loop_process.join()
         self.left_motor.reset_motor()
         self.right_motor.reset_motor()
 

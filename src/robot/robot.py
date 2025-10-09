@@ -6,6 +6,7 @@ from network.udp_client import UdpClient
 from network.websocket import WebsocketClient
 from util.timed_task import TimedTask
 from util.lowpassfilter import LowPassFilter
+from multiprocessing import Value
 
 # === Configuration Loading ===
 config = ConfigParser()
@@ -34,7 +35,7 @@ class BalancingRobot:
 
         self._stop_event = stop_event
 
-        self.running = False
+        self.running = Value('b', False)
         self.previous_angle = 0.0
         self.average_speed = 0.0
         self.counter = 0
@@ -100,6 +101,12 @@ class BalancingRobot:
         if self.use_pos_pid:
             self.send_pid_constants()
     
+    def start_processed_motors(self):
+        self.motor_controller.start()
+
+    def stop_processed_motors(self):
+        self.motor_controller.stop()
+
     def activate_processed_motors(self):
         self.motor_controller.activate_processed_motors()
 
@@ -107,21 +114,23 @@ class BalancingRobot:
         self.motor_controller.deactivate_processed_motors()
         self._reset_pids()
 
+    # TODO: Change robot status to send all relevant data at once
     def start(self):
-        if not self.running:
+        if not self.running.value:
             self.motor_controller.start()
             self._setup_filters()
             self._setup_startup_state()
-            self.running = True
-            self.client.emit('robot_status', self.running)
+            self.running.value = True
+            self.client.emit('robot_status', self.running.value)
             self.loop()
 
+    # TODO: Motors turn strangely slow after stopping and starting again
     def stop(self):
         self.motor_controller.stop()
         self._reset_pids()
-        self.running = False
+        self.running.value = False
         print(f'Counter: {self.counter}')
-        self.client.emit('robot_status', self.running)
+        self.client.emit('robot_status', self.running.value)
 
     def _reset_pids(self):
         self.angle_pid.reset_controller()
@@ -131,13 +140,15 @@ class BalancingRobot:
         self.udp_client = UdpClient(BROKER, PORT)
         self.client = WebsocketClient(
             set_pid_constants=self.set_pid_constants,
-            get_pid_constants=self.send_pid_constants,
+            send_pid_constants=self.send_pid_constants,
             calibrate_mpu=self.calibrate_mpu,
             start_robot=self.start,
             stop_robot=self.stop,
             shutdown_robot=self.shutdown,
             save_settings=self.save_settings,
             switch_pos_pid=self.switch_pos_pid,
+            start_motors=self.start_processed_motors,
+            stop_motors=self.stop_processed_motors,
             activate_motors=self.activate_processed_motors,
             deactivate_motors=self.deactivate_processed_motors
         )
@@ -155,8 +166,8 @@ class BalancingRobot:
         self.starting_time = time()
 
     def loop(self):
-        while self.running:
-            self.control_loop_task.loop()
+        while self.running.value:
+            self.control_loop_task.loop()       # Tasks that run at fixed intervals
             self.motor_controller.loop()
 
     def _control_loop(self, now, dt):
@@ -231,7 +242,7 @@ class BalancingRobot:
         self.angle_pid.set_setpoint(target)
         output, a_pterm, a_iterm, a_dterm = self.angle_pid.update(angle, dt)
         speed = -output                 # Invert output for motor control: Positive angle -> positive speed
-        self.data_collector.collect(angle_pid_output=output, a_pterm=a_pterm, a_iterm=a_iterm, a_dterm=a_dterm)
+        self.data_collector.collect(speed=output, a_pterm=a_pterm, a_iterm=a_iterm, a_dterm=a_dterm)
         return speed
 
     def _apply_motor_speed(self, speed):

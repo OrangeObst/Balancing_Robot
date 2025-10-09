@@ -17,7 +17,7 @@ class MotorController:
 
     def stop(self):
         if self.processed:
-            self.processed_motors.reset_motors()
+            self.processed_motors.stop()
         elif self.use_motors:
             self.left_motor.reset_motor()
             self.right_motor.reset_motor()
@@ -25,11 +25,10 @@ class MotorController:
     def activate_processed_motors(self):
         if not self.processed:
             self.processed = True
-            self.processed_motors.start()
 
     def deactivate_processed_motors(self):
+        self.stop()
         self.processed = False
-        self.processed_motors.stop()
 
     def activate_motors(self):
         self.use_motors = True
