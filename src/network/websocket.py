@@ -38,15 +38,15 @@ class WebsocketClient:
             save_settings()
 
         @self.sio.on('switch_pos_pid', namespace='/robot')
-        def switch_pos_pid():
+        def on_switch_pos_pid():
             switch_pos_pid()
 
         @self.sio.on('activate_motors', namespace='/robot')
-        def activate_motors():
+        def on_activate_motors():
             activate_motors()
 
         @self.sio.on('deactivate_motors', namespace='/robot')
-        def deactivate_motors():
+        def on_deactivate_motors():
             deactivate_motors()
 
     def connect(self):

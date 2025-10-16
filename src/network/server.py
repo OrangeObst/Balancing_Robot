@@ -57,9 +57,9 @@ def handle_shutdown_robot():
 def handle_save_settings():
     socketio.emit('save_settings', namespace='/robot')
 
-@socketio.on('switch_PosPid', namespace='/client')
-def handle_switch_PosPid():
-    socketio.emit('switch_PosPid', namespace='/robot')
+@socketio.on('switch_pos_pid', namespace='/client')
+def handle_switch_pos_pid():
+    socketio.emit('switch_pos_pid', namespace='/robot')
 
 @socketio.on('activateMotors', namespace='/client')
 def handle_activate_motors():
