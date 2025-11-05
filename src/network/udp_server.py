@@ -5,6 +5,8 @@ import time
 from math import degrees, atan2, sqrt
 
 # TODO: read up on kalman filter. run kalman on every value or on averages?
+# ping / rtt info: https://github.com/ChuanyuXue/udp-latency?tab=readme-ov-file
+# https://github.com/bestvibes/IEEE1588-PTP/blob/dev/slave/slave.py
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(('0.0.0.0', 17002))

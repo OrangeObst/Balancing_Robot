@@ -16,3 +16,7 @@ print(f"CPU Usage: {cpu_usage}%")
 
 network = psutil.net_io_counters(pernic=True)
 print(f"Bytes Sent: {network}, Bytes Received: {network}")
+
+test_list = [1, 2, 3, 4, 5]
+print(f"Original List: {test_list}")
+print(f'Shortened List: {test_list[-3:]}')
